@@ -1,0 +1,88 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* Brand */
+  --color-brand-red: #d5232b;
+  --color-brand-red-hover: #bd1c24;
+  --color-brand-pink: #ff9dc4;
+  --color-brand-pink-soft: #ffe3ee;
+
+  /* Surfaces */
+  --color-ink: #16161a;
+  --color-ink-soft: #4b4b55;
+  --color-ink-faint: #8b8b96;
+  --color-surface: #ffffff;
+  --color-surface-sunken: #f3f4f7;
+  --color-surface-raised: #ffffff;
+  --color-hairline: #e6e7ec;
+  --color-hairline-strong: #d5d7de;
+
+  /* Radii */
+  --radius-xs: 6px;
+  --radius-sm: 10px;
+  --radius-md: 14px;
+  --radius-lg: 20px;
+  --radius-xl: 28px;
+
+  /* Typography */
+  --font-display: var(--font-fredoka);
+  --font-sans: var(--font-inter);
+
+  /* Elevation */
+  --shadow-pop: 0 18px 40px -12px rgb(22 22 26 / 0.22), 0 2px 8px -2px rgb(22 22 26 / 0.1);
+  --shadow-rail: 0 8px 24px -10px rgb(22 22 26 / 0.18);
+  --shadow-card: 0 24px 60px -20px rgb(22 22 26 / 0.35);
+}
+
+:root {
+  --rail-width: 84px;
+  --topbar-height: 64px;
+  color-scheme: light;
+}
+
+/*
+ * These belong in @layer base so Tailwind utilities can still override them —
+ * unlayered rules beat every layered utility regardless of specificity, which
+ * would make `focus:outline-none` silently do nothing.
+ */
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+
+  body {
+    background: var(--color-surface-sunken);
+    color: var(--color-ink);
+    font-family: var(--font-sans), system-ui, sans-serif;
+    overscroll-behavior: none;
+  }
+
+  /* Playful focus ring */
+  :where(button, a, [role="button"], input, textarea, select):focus-visible {
+    outline: 2px solid var(--color-brand-red);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
+
+/* Subtle dot grid for the canvas backdrop */
+.canvas-backdrop {
+  background-color: var(--color-surface-sunken);
+  background-image: radial-gradient(circle at 1px 1px, rgb(22 22 26 / 0.06) 1px, transparent 0);
+  background-size: 22px 22px;
+}
+
+.scroll-slim {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-hairline-strong) transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
