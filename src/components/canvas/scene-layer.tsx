@@ -1,50 +1,77 @@
 "use client";
 
 import { motion } from "motion/react";
-import { findBackground } from "@/lib/digital-card";
+import { useEffect, useRef, useState } from "react";
+import { GradientBackground } from "@/components/canvas/gradient-background";
+import {
+  describeScene,
+  findAssetScene,
+} from "@/lib/digital-card";
+import { PALETTES } from "@/lib/gradient-palettes";
+import { THEMES, themeTint } from "@/lib/themes";
 import { useEditorStore } from "@/store/editor-store";
 
 /**
  * The scene a digital card sits in. It lives behind the artwork rather than in
  * it, which is why switching is instant — nothing is re-rendered.
  *
- * The real scenes are 3D and video; this is a moving stand-in so the card is
- * never shown floating on a flat editor grey when it will not ship that way.
+ * Gradient scenes are the real thing, ported from the gradient-backgrounds
+ * repo. Themes and video are stand-ins until their engines are embedded.
  */
 export function SceneLayer() {
-  const background = useEditorStore((s) => s.digital.background);
-  const scene = findBackground(background);
+  const scene = useEditorStore((s) => s.digital.scene);
+  const hostRef = useRef<HTMLDivElement>(null);
+  const [maxDimension, setMaxDimension] = useState(1200);
+
+  // Gradient shapes are sized from the container's larger dimension so they
+  // stay round whatever shape the canvas is.
+  useEffect(() => {
+    const host = hostRef.current;
+    if (!host) return;
+    const observer = new ResizeObserver(([entry]) => {
+      const { width, height } = entry.contentRect;
+      setMaxDimension(Math.max(width, height));
+    });
+    observer.observe(host);
+    return () => observer.disconnect();
+  }, []);
 
   return (
-    <motion.div
-      key={scene.id}
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      transition={{ duration: 0.4 }}
+    <div
+      ref={hostRef}
       className="pointer-events-none absolute inset-0 overflow-hidden"
       aria-hidden
     >
-      <div
-        className="absolute inset-0"
-        style={{ backgroundImage: `linear-gradient(145deg, ${scene.gradient})` }}
-      />
-      {/* Slow drift so a "3D Animation" scene doesn't read as a flat fill. */}
-      <motion.div
-        className="absolute -inset-1/4 opacity-55 mix-blend-soft-light"
-        style={{
-          backgroundImage: `radial-gradient(closest-side, rgb(255 255 255 / 0.85), transparent 70%),
-            radial-gradient(closest-side, rgb(255 255 255 / 0.5), transparent 70%)`,
-          backgroundSize: "55% 55%, 40% 40%",
-          backgroundPosition: "20% 30%, 75% 65%",
-          backgroundRepeat: "no-repeat",
-        }}
-        animate={{ x: ["-3%", "3%", "-3%"], y: ["2%", "-2%", "2%"] }}
-        transition={{ duration: 18, repeat: Infinity, ease: "easeInOut" }}
-      />
+      {scene.kind === "Gradient" ? (
+        <GradientBackground
+          styleId={scene.styleId}
+          palette={
+            PALETTES.find((p) => p.id === scene.paletteId) ?? PALETTES[0]
+          }
+          maxDimension={maxDimension}
+        />
+      ) : (
+        <motion.div
+          key={describeScene(scene)}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="absolute inset-0"
+          style={{
+            backgroundImage:
+              scene.kind === "3D Animation"
+                ? themeTint(
+                    THEMES.find((t) => t.id === scene.themeId) ?? THEMES[0],
+                  )
+                : `linear-gradient(145deg, ${findAssetScene(scene.id).gradient})`,
+          }}
+        />
+      )}
+
       {/* Top-right: the toolbar owns top-centre and the face switcher the bottom. */}
-      <span className="absolute right-4 top-5 rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
-        {scene.label} · {scene.kind}
+      <span className="absolute right-4 top-5 max-w-[40%] truncate rounded-full bg-black/35 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+        {describeScene(scene)}
       </span>
-    </motion.div>
+    </div>
   );
 }

@@ -1,4 +1,6 @@
 @import "tailwindcss";
+/* Animated gradient scenes, lifted from the gradient-backgrounds repo. */
+@import "./gradients.css";
 
 @theme inline {
   /* Brand — values taken from the production Figma token export, not eyeballed. */

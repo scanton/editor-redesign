@@ -9,7 +9,11 @@ import {
   sampleFor,
   type LongFormLength,
 } from "@/lib/long-form";
-import { REVEAL_STEPS, type CoverLayout } from "@/lib/digital-card";
+import {
+  REVEAL_STEPS,
+  type CoverLayout,
+  type Scene,
+} from "@/lib/digital-card";
 import type {
   AnnotationRect,
   AnnotationRequest,
@@ -64,7 +68,7 @@ type EditorState = {
 
   /** Digital rendition: the scene behind the card, how it opens, what they read first. */
   digital: {
-    background: string;
+    scene: Scene;
     backgroundTab: string;
     envelopeLook: string | null;
     envelopeColour: string;
@@ -246,7 +250,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSurface: (surface) => set({ surface }),
 
   digital: {
-    background: "blue",
+    scene: { kind: "Gradient", styleId: "aurora", paletteId: "northern-lights" },
     backgroundTab: "All",
     envelopeLook: "m1",
     envelopeColour: "#f5bdc2",

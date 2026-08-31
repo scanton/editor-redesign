@@ -8,7 +8,7 @@ import { springBouncy, springTight, staggerParent } from "@/lib/motion";
 import { findStyle } from "@/lib/art-styles";
 import {
   REVEAL_PRESETS,
-  findBackground,
+  describeScene,
   findEnvelopeLook,
   findRevealStep,
 } from "@/lib/digital-card";
@@ -87,7 +87,7 @@ export function ReviewPanel() {
       {
         step: "Personalize",
         key: "Scene",
-        value: findBackground(digital.background).label,
+        value: describeScene(digital.scene),
       },
       {
         step: "Personalize",

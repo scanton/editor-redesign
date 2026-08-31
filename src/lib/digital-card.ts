@@ -1,72 +1,99 @@
+import { GRADIENT_STYLES } from "./gradient-styles";
+import { PALETTES } from "./gradient-palettes";
+import { EFFECT_COUNT, THEME_COUNT, findTheme } from "./themes";
+
 /**
  * The digital card's presentation layer: the scene it sits in, the envelope it
  * arrives in, how it opens, and what the recipient reads first. Catalogue names
  * and counts are the production ones; thumbnails come from the asset service.
  */
 
-export type BackgroundKind = "3D Animation" | "Video BG" | "Stills";
+/**
+ * A scene is one of four kinds. Gradients and themes are generated, so they are
+ * described by their parameters rather than picked from a fixed list; video and
+ * stills come from the asset library.
+ */
+export type BackgroundKind = "Gradient" | "3D Animation" | "Video BG" | "Stills";
 
-export type Background = {
+export type Scene =
+  | { kind: "Gradient"; styleId: string; paletteId: string }
+  | { kind: "3D Animation"; themeId: string }
+  | { kind: "Video BG" | "Stills"; id: string };
+
+/** Video and still scenes, which are flat assets rather than generated. */
+export const ASSET_SCENES: {
   id: string;
   label: string;
-  kind: BackgroundKind;
-  /** Stand-in for the real asset — a scene is motion, not a flat colour. */
+  kind: "Video BG" | "Stills";
   gradient: string;
-};
-
-export const BACKGROUNDS: Background[] = [
-  { id: "loverain", label: "Love Rain", kind: "3D Animation", gradient: "#ff9ec4, #ff4f7e" },
-  { id: "holiday", label: "Holiday", kind: "Stills", gradient: "#1a1030, #c9a227" },
-  { id: "partytime", label: "Party Time", kind: "3D Animation", gradient: "#00c2b8, #ffd23f" },
-  { id: "winter", label: "Winter", kind: "3D Animation", gradient: "#0d1b3a, #7fb2e5" },
-  { id: "autumn", label: "Autumn", kind: "Stills", gradient: "#b2451d, #e8a33d" },
-  { id: "suds", label: "Suds", kind: "3D Animation", gradient: "#c98a2a, #f5e2a8" },
-  { id: "woodstock", label: "Woodstock", kind: "3D Animation", gradient: "#2fd18b, #b14bd8" },
-  { id: "musicfest", label: "Music Fest", kind: "3D Animation", gradient: "#12043a, #ff2d95" },
-  { id: "rosegold", label: "Rose Gold Confetti", kind: "Video BG", gradient: "#f7c9b8, #d98b6f" },
-  { id: "blue", label: "Liquid Cobalt", kind: "Video BG", gradient: "#1f3fd8, #7fb2e5" },
-];
-
-/** Rows as the production panel groups them, with real library counts. */
-export const BACKGROUND_ROWS: {
-  id: string;
-  title: string;
-  count: number;
-  ids: string[];
-  wide?: boolean;
 }[] = [
   {
-    id: "rec",
-    title: "Recommended for this card",
-    count: 8,
-    ids: ["loverain", "holiday", "partytime", "winter", "autumn", "suds"],
+    id: "rosegold",
+    label: "Rose Gold Confetti",
+    kind: "Video BG",
+    gradient: "#f7c9b8, #d98b6f",
   },
   {
-    id: "anim",
-    title: "3D Animation · theme × effect",
-    count: 64,
-    ids: ["woodstock", "musicfest", "suds", "autumn", "winter", "holiday"],
+    id: "blue",
+    label: "Liquid Cobalt",
+    kind: "Video BG",
+    gradient: "#1f3fd8, #7fb2e5",
   },
   {
-    id: "video",
-    title: "Video BG · cinematic",
-    count: 450,
-    ids: ["rosegold", "blue"],
-    wide: true,
+    id: "holiday-still",
+    label: "Holiday",
+    kind: "Stills",
+    gradient: "#1a1030, #c9a227",
+  },
+  {
+    id: "autumn-still",
+    label: "Autumn",
+    kind: "Stills",
+    gradient: "#b2451d, #e8a33d",
   },
 ];
 
 export const BACKGROUND_TABS: ("All" | BackgroundKind)[] = [
   "All",
+  "Gradient",
   "3D Animation",
   "Video BG",
   "Stills",
 ];
 
-export const TOTAL_BACKGROUNDS = 450;
+/** What the library holds in production, per kind. */
+export const SCENE_COUNTS = {
+  gradient: GRADIENT_STYLES.length * PALETTES.length,
+  themes: THEME_COUNT * EFFECT_COUNT,
+  video: 450,
+  stills: 120,
+};
 
-export function findBackground(id: string) {
-  return BACKGROUNDS.find((b) => b.id === id) ?? BACKGROUNDS[0];
+export const TOTAL_BACKGROUNDS =
+  SCENE_COUNTS.gradient +
+  SCENE_COUNTS.themes +
+  SCENE_COUNTS.video +
+  SCENE_COUNTS.stills;
+
+export function findAssetScene(id: string) {
+  return ASSET_SCENES.find((s) => s.id === id) ?? ASSET_SCENES[0];
+}
+
+/** One-line description of whatever scene is set. */
+export function describeScene(scene: Scene): string {
+  if (scene.kind === "Gradient") {
+    const style = GRADIENT_STYLES.find((s) => s.id === scene.styleId);
+    const palette = PALETTES.find((p) => p.id === scene.paletteId);
+    return `${style?.name ?? "Gradient"} · ${palette?.name ?? ""}`;
+  }
+  if (scene.kind === "3D Animation") {
+    return findTheme(scene.themeId)?.label ?? "Animated theme";
+  }
+  return findAssetScene(scene.id).label;
+}
+
+export function sceneKindLabel(scene: Scene) {
+  return scene.kind;
 }
 
 /* ─────────────────────────────────────────────── envelope looks ── */
