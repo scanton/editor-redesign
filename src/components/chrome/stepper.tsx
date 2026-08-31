@@ -74,7 +74,7 @@ export function Stepper() {
         >
           <motion.button
             type="button"
-            aria-label={`${warnings.length} things unfinished`}
+            aria-label={`${warnings.length} thing${warnings.length === 1 ? "" : "s"} unfinished`}
             onClick={warnings[0].go}
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}

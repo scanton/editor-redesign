@@ -15,7 +15,7 @@ import {
 import {
   DIGITAL_DELIVERY,
   PRINTED_DELIVERY,
-  STOCKS,
+  PRINT_SPEC,
   upsellFor,
 } from "@/lib/fulfilment";
 import { findLanguage } from "@/lib/languages";
@@ -139,9 +139,7 @@ export function ReviewPanel() {
       {
         step: "Finish",
         key: "Print",
-        value: `${plural(fulfilment.quantity, "copy", "copies")} · ${
-          STOCKS.find((s) => s.id === fulfilment.stock)?.label ?? ""
-        }`,
+        value: `${plural(fulfilment.quantity, "copy", "copies")} · ${PRINT_SPEC.stock}`,
       },
     );
   }

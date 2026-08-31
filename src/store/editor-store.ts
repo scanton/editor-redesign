@@ -91,8 +91,6 @@ type EditorState = {
     printedDelivery: PrintedDelivery;
     recipients: Recipient[];
     quantity: number;
-    stock: string;
-    corners: string;
   };
   setFulfilment: (patch: Partial<EditorState["fulfilment"]>) => void;
   addRecipient: () => void;
@@ -281,8 +279,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       },
     ],
     quantity: 1,
-    stock: "matte",
-    corners: "square",
   },
   setFulfilment: (patch) =>
     set((s) => ({ fulfilment: { ...s.fulfilment, ...patch } })),

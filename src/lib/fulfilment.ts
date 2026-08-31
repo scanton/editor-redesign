@@ -36,16 +36,15 @@ export const PRINTED_DELIVERY = [
 export type DigitalDelivery = (typeof DIGITAL_DELIVERY)[number]["id"];
 export type PrintedDelivery = (typeof PRINTED_DELIVERY)[number]["id"];
 
-export const STOCKS = [
-  { id: "matte", label: "Heavyweight matte", detail: "350gsm" },
-  { id: "pearl", label: "Pearlescent", detail: "320gsm" },
-  { id: "recycled", label: "Recycled kraft", detail: "300gsm" },
-] as const;
-
-export const CORNERS = [
-  { id: "square", label: "Square" },
-  { id: "rounded", label: "Rounded" },
-] as const;
+/**
+ * Print is one specification, not a set of choices — we run a single stock and
+ * square corners. These are facts to state, not options to offer.
+ */
+export const PRINT_SPEC = {
+  stock: "Heavyweight matte · 350gsm",
+  corners: "Square",
+  region: "United States · First-class postage",
+};
 
 export type Recipient = {
   id: string;
