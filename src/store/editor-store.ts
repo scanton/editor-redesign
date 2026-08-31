@@ -72,6 +72,11 @@ type EditorState = {
     backgroundTab: string;
     envelopeLook: string | null;
     envelopeColour: string;
+    /** Which part of the envelope the fine-tune rows are showing. */
+    envelopeDecorPart: "liner" | "stamp" | "seal";
+    envelopeLiner: string;
+    envelopeStamp: string;
+    envelopeSeal: string;
     reveal: {
       preset: string;
       /** Step ids in play order; reorderable. */
@@ -259,6 +264,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     backgroundTab: "All",
     envelopeLook: "m1",
     envelopeColour: "#f5bdc2",
+    envelopeDecorPart: "liner",
+    envelopeLiner: "baby",
+    envelopeStamp: "classic",
+    envelopeSeal: "wax-red",
     reveal: {
       preset: "rise",
       sequence: REVEAL_STEPS.map((s) => s.id),

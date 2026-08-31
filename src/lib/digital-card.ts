@@ -106,6 +106,8 @@ export type EnvelopeLook = {
   /** Envelope body colour; the liner reads as its lighter partner. */
   hex: string;
   liner: string;
+  /** The liner asset a matched set dresses the envelope with. */
+  linerId: string;
 };
 
 export const ENVELOPE_LOOK_ROWS: {
@@ -117,19 +119,19 @@ export const ENVELOPE_LOOK_ROWS: {
     title: "Matched to your card",
     note: "Generated from your artwork",
     looks: [
-      { id: "m1", label: "Blush glow", hex: "#f5bdc2", liner: "#fde7ea" },
-      { id: "m2", label: "Meadow gold", hex: "#f6f0e2", liner: "#e0cf9a" },
-      { id: "m3", label: "Dusk plum", hex: "#c5b4e8", liner: "#ece5fa" },
+      { id: "m1", label: "Blush glow", hex: "#f5bdc2", liner: "#fde7ea", linerId: "baby" },
+      { id: "m2", label: "Meadow gold", hex: "#f6f0e2", liner: "#e0cf9a", linerId: "anniversary" },
+      { id: "m3", label: "Dusk plum", hex: "#c5b4e8", liner: "#ece5fa", linerId: "tiedye" },
     ],
   },
   {
     title: "Library",
     note: "Complete sets, one tap each",
     looks: [
-      { id: "l1", label: "Anniversary", hex: "#be1d2c", liner: "#f3c9cd" },
-      { id: "l2", label: "New Baby", hex: "#9fb0c0", liner: "#e3ebf2" },
-      { id: "l3", label: "Tie-Dye", hex: "#c9a94b", liner: "#f2e6c2" },
-      { id: "l4", label: "Kids", hex: "#ffffff", liner: "#ffe9a8" },
+      { id: "l1", label: "Anniversary", hex: "#be1d2c", liner: "#f3c9cd", linerId: "anniversary" },
+      { id: "l2", label: "New Baby", hex: "#9fb0c0", liner: "#e3ebf2", linerId: "baby" },
+      { id: "l3", label: "Tie-Dye", hex: "#c9a94b", liner: "#f2e6c2", linerId: "tiedye" },
+      { id: "l4", label: "Kids", hex: "#ffffff", liner: "#ffe9a8", linerId: "kids" },
     ],
   },
 ];
@@ -139,6 +141,89 @@ export const ALL_ENVELOPE_LOOKS = ENVELOPE_LOOK_ROWS.flatMap((r) => r.looks);
 export function findEnvelopeLook(id: string | null) {
   return ALL_ENVELOPE_LOOKS.find((l) => l.id === id) ?? null;
 }
+
+/**
+ * The envelope is dressed in three parts. Each is browsed by row the way the
+ * production panel groups them; the counts are the library's, the four assets
+ * per part are what the current set ships.
+ */
+export type EnvelopeDecorPart = "liner" | "stamp" | "seal";
+
+export type DecorAsset = {
+  id: string;
+  label: string;
+  /** Stand-in artwork until the real swatches are wired up. */
+  swatch: string;
+};
+
+const LINERS: DecorAsset[] = [
+  {
+    id: "tiedye",
+    label: "Tie Dye",
+    swatch:
+      "conic-gradient(from 210deg, #7fd6ff, #c9a8ff, #ffb3d9, #ffe08a, #9be7c4, #7fd6ff)",
+  },
+  {
+    id: "anniversary",
+    label: "Anniversary",
+    swatch:
+      "radial-gradient(circle at 30% 30%, #f7d9c4 0 18%, transparent 19%), radial-gradient(circle at 72% 68%, #eec3a8 0 14%, transparent 15%), linear-gradient(160deg, #fbeee2, #f2ddc9)",
+  },
+  {
+    id: "baby",
+    label: "Baby",
+    swatch:
+      "radial-gradient(circle at 25% 35%, #ffd0e0 0 16%, transparent 17%), radial-gradient(circle at 70% 72%, #ffc0d6 0 12%, transparent 13%), linear-gradient(160deg, #fff2f6, #ffe3ee)",
+  },
+  {
+    id: "kids",
+    label: "Kids",
+    swatch:
+      "radial-gradient(circle at 28% 30%, #ffd166 0 10%, transparent 11%), radial-gradient(circle at 68% 66%, #7fd6ff 0 9%, transparent 10%), linear-gradient(160deg, #2b2170, #4b3bb0)",
+  },
+];
+
+const STAMPS: DecorAsset[] = [
+  { id: "classic", label: "Classic", swatch: "linear-gradient(150deg, #f2e8d5, #cbb98f)" },
+  { id: "botanical", label: "Botanical", swatch: "linear-gradient(150deg, #dbe9d2, #6f9366)" },
+  { id: "heart", label: "Heart", swatch: "linear-gradient(150deg, #ffd7de, #d4536b)" },
+  { id: "vintage", label: "Vintage", swatch: "linear-gradient(150deg, #e6d3b3, #8a6b46)" },
+];
+
+const SEALS: DecorAsset[] = [
+  { id: "wax-red", label: "Wax red", swatch: "radial-gradient(circle at 38% 34%, #e0525f, #8c1420 70%)" },
+  { id: "wax-cream", label: "Wax cream", swatch: "radial-gradient(circle at 38% 34%, #f6ecd8, #c2a875 70%)" },
+  { id: "monogram", label: "Monogram", swatch: "radial-gradient(circle at 38% 34%, #3b3b56, #17172a 70%)" },
+  { id: "foil", label: "Foil", swatch: "radial-gradient(circle at 38% 34%, #f8e6a8, #b08d2f 70%)" },
+];
+
+export const ENVELOPE_DECOR: Record<
+  EnvelopeDecorPart,
+  { assets: DecorAsset[]; rows: { title: string; count: number; order: number[] }[] }
+> = {
+  liner: {
+    assets: LINERS,
+    rows: [
+      { title: "Popular", count: 14, order: [0, 1, 2, 3] },
+      { title: "By occasion", count: 38, order: [1, 2, 3, 0] },
+      { title: "Pattern", count: 22, order: [0, 3, 1, 2] },
+    ],
+  },
+  stamp: {
+    assets: STAMPS,
+    rows: [
+      { title: "Popular", count: 9, order: [0, 1, 2, 3] },
+      { title: "Classic post", count: 12, order: [3, 0, 1, 2] },
+    ],
+  },
+  seal: {
+    assets: SEALS,
+    rows: [
+      { title: "Popular", count: 11, order: [0, 1, 2, 3] },
+      { title: "Monogram", count: 26, order: [2, 3, 0, 1] },
+    ],
+  },
+};
 
 export const ENVELOPE_COLOURS = [
   "#ffffff",

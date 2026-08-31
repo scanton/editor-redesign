@@ -5,6 +5,7 @@ import { Check, Sparkles } from "lucide-react";
 import {
   Divider,
   PanelBody,
+  Segmented,
   PanelFooter,
   PrimaryButton,
   Section,
@@ -13,8 +14,10 @@ import {
 } from "@/components/rail/panels/parts";
 import {
   ENVELOPE_COLOURS,
+  ENVELOPE_DECOR,
   ENVELOPE_LOOK_ROWS,
   findEnvelopeLook,
+  type EnvelopeDecorPart,
 } from "@/lib/digital-card";
 import { springBouncy, staggerParent } from "@/lib/motion";
 import { CARD_FONTS } from "@/lib/fonts";
@@ -41,6 +44,23 @@ export function EnvelopePanel() {
   const isDigital = useEditorStore((s) => s.cardType === "digital");
 
   const look = findEnvelopeLook(digital.envelopeLook);
+
+  const selectedDecor = {
+    liner: digital.envelopeLiner,
+    stamp: digital.envelopeStamp,
+    seal: digital.envelopeSeal,
+  }[digital.envelopeDecorPart];
+
+  /** Changing one part keeps the rest, but moves you off the matched look. */
+  const pickDecor = (id: string) =>
+    setDigital({
+      envelopeLook: null,
+      ...(digital.envelopeDecorPart === "liner"
+        ? { envelopeLiner: id }
+        : digital.envelopeDecorPart === "stamp"
+          ? { envelopeStamp: id }
+          : { envelopeSeal: id }),
+    });
 
   return (
     <>
@@ -88,9 +108,11 @@ export function EnvelopePanel() {
                             key={item.id}
                             type="button"
                             onClick={() =>
+                              // A matched set dresses every part at once.
                               setDigital({
                                 envelopeLook: item.id,
                                 envelopeColour: item.hex,
+                                envelopeLiner: item.linerId,
                               })
                             }
                             whileHover={{ scale: 1.05, y: -2 }}
@@ -158,6 +180,81 @@ export function EnvelopePanel() {
                     setDigital({ envelopeColour: hex, envelopeLook: null })
                   }
                 />
+              </Section>
+
+              <Section>
+                <Segmented
+                  id="envelope-decor"
+                  options={[
+                    { value: "liner", label: "Liner" },
+                    { value: "stamp", label: "Stamp" },
+                    { value: "seal", label: "Seal" },
+                  ]}
+                  value={digital.envelopeDecorPart}
+                  onChange={(part) =>
+                    setDigital({ envelopeDecorPart: part as EnvelopeDecorPart })
+                  }
+                />
+              </Section>
+
+              {ENVELOPE_DECOR[digital.envelopeDecorPart].rows.map((row) => (
+                <Section
+                  key={row.title}
+                  title={row.title}
+                  action={
+                    <span className="text-[11.5px] tabular-nums text-ink-faint">
+                      {row.count}
+                    </span>
+                  }
+                >
+                  <div className="grid grid-cols-4 gap-2">
+                    {row.order.map((i) => {
+                      const asset =
+                        ENVELOPE_DECOR[digital.envelopeDecorPart].assets[i];
+                      const on = selectedDecor === asset.id;
+                      return (
+                        <motion.button
+                          key={row.title + asset.id}
+                          type="button"
+                          title={asset.label}
+                          onClick={() => pickDecor(asset.id)}
+                          whileHover={{ scale: 1.06, y: -2 }}
+                          whileTap={{ scale: 0.95 }}
+                          transition={springBouncy}
+                          className="text-left"
+                        >
+                          <span
+                            className={cn(
+                              "block aspect-square rounded-[8px] ring-2",
+                              on
+                                ? "ring-ink"
+                                : "ring-transparent hover:ring-hairline-strong",
+                            )}
+                            style={{ backgroundImage: asset.swatch }}
+                          />
+                          <span
+                            className={cn(
+                              "mt-1 block truncate text-[10.5px] leading-tight",
+                              on ? "font-semibold text-ink" : "text-ink-faint",
+                            )}
+                          >
+                            {asset.label}
+                          </span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </Section>
+              ))}
+
+              <Section>
+                <p className="flex gap-2 rounded-[12px] bg-surface-sunken/70 p-3 text-[12px] leading-snug text-ink-faint">
+                  <Check size={14} className="mt-0.5 shrink-0 text-brand-red" />
+                  <span>
+                    Liner, stamp and seal are included. No per-guest charges,
+                    ever.
+                  </span>
+                </p>
               </Section>
             </>
           )}
