@@ -9,11 +9,13 @@ import {
   sampleFor,
   type LongFormLength,
 } from "@/lib/long-form";
+import { REVEAL_STEPS, type CoverLayout } from "@/lib/digital-card";
 import type {
   AnnotationRect,
   AnnotationRequest,
   CanvasMode,
   CardType,
+  Surface,
   Segment,
   Step,
   CardDoc,
@@ -23,7 +25,7 @@ import type {
   ToolId,
 } from "@/lib/types";
 import { boundsOf } from "@/lib/lasso";
-import { STEP_TOOLS } from "@/lib/steps";
+import { stepTools } from "@/lib/steps";
 import { clamp, uid } from "@/lib/utils";
 
 const MAX_HISTORY = 50;
@@ -49,6 +51,36 @@ type EditorState = {
   /** One card, two saved renditions. Switching never discards the other. */
   cardType: CardType;
   setCardType: (type: CardType) => void;
+
+  /** The canvas shows the card or the envelope it arrives in. */
+  surface: Surface;
+  setSurface: (surface: Surface) => void;
+
+  /** Digital rendition: the scene behind the card, how it opens, what they read first. */
+  digital: {
+    background: string;
+    backgroundTab: string;
+    envelopeLook: string | null;
+    envelopeColour: string;
+    reveal: {
+      preset: string;
+      /** Step ids in play order; reorderable. */
+      sequence: string[];
+      skipped: string[];
+      music: boolean;
+      reducedMotion: boolean;
+    };
+    cover: {
+      on: boolean;
+      showSender: boolean;
+      showAvatar: boolean;
+      layout: CoverLayout;
+    };
+  };
+  setDigital: (patch: Partial<EditorState["digital"]>) => void;
+  setReveal: (patch: Partial<EditorState["digital"]["reveal"]>) => void;
+  setCover: (patch: Partial<EditorState["digital"]["cover"]>) => void;
+  toggleRevealStep: (id: string) => void;
   /** Flyout stays mounted but collapses when the rail is pinned closed. */
   railPinned: boolean;
   zoom: number;
@@ -163,7 +195,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setStep: (step) => {
     // Panels belong to a step; leaving a step closes whatever it had open.
     const tool = get().activeTool;
-    const keeps = tool !== null && STEP_TOOLS[step].includes(tool);
+    const keeps = tool !== null && stepTools(step, get().cardType).includes(tool);
     set({
       step,
       activeTool: keeps ? tool : null,
@@ -174,7 +206,57 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     });
   },
   cardType: "printed",
-  setCardType: (cardType) => set({ cardType }),
+  setCardType: (cardType) => {
+    // The rail forks here, so a panel that only exists on the other rendition
+    // has to close rather than linger.
+    const { step, activeTool } = get();
+    const keeps =
+      activeTool !== null && stepTools(step, cardType).includes(activeTool);
+    set({
+      cardType,
+      activeTool: keeps ? activeTool : "cardtype",
+      surface: "card",
+    });
+  },
+
+  surface: "card",
+  setSurface: (surface) => set({ surface }),
+
+  digital: {
+    background: "blue",
+    backgroundTab: "All",
+    envelopeLook: "m1",
+    envelopeColour: "#f5bdc2",
+    reveal: {
+      preset: "rise",
+      sequence: REVEAL_STEPS.map((s) => s.id),
+      skipped: [],
+      music: false,
+      reducedMotion: true,
+    },
+    cover: {
+      on: true,
+      showSender: true,
+      showAvatar: true,
+      layout: "centred",
+    },
+  },
+  setDigital: (patch) => set((s) => ({ digital: { ...s.digital, ...patch } })),
+  setReveal: (patch) =>
+    set((s) => ({
+      digital: { ...s.digital, reveal: { ...s.digital.reveal, ...patch } },
+    })),
+  setCover: (patch) =>
+    set((s) => ({
+      digital: { ...s.digital, cover: { ...s.digital.cover, ...patch } },
+    })),
+  toggleRevealStep: (id) =>
+    set((s) => {
+      const skipped = s.digital.reveal.skipped.includes(id)
+        ? s.digital.reveal.skipped.filter((x) => x !== id)
+        : [...s.digital.reveal.skipped, id];
+      return { digital: { ...s.digital, reveal: { ...s.digital.reveal, skipped } } };
+    }),
   railPinned: false,
   zoom: 0.46,
   credits: 10535,

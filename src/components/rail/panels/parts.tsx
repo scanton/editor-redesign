@@ -383,6 +383,49 @@ export function StubCard({
   );
 }
 
+/**
+ * Marks a control that is designed but not built. Distinct from a "Stub" note:
+ * a stub stands in for something that exists, Planned says it does not yet.
+ */
+export function PlannedBadge() {
+  return (
+    <span className="inline-flex items-center rounded-full border border-brand-red/45 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-ink-soft">
+      Planned
+    </span>
+  );
+}
+
+export function Toggle({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      onClick={() => onChange(!checked)}
+      className={cn(
+        "relative h-6 w-10 shrink-0 rounded-full transition-colors",
+        checked ? "bg-brand-red" : "bg-hairline-strong",
+      )}
+    >
+      <motion.span
+        layout
+        transition={springBouncy}
+        className="absolute top-0.5 h-5 w-5 rounded-full bg-white shadow-sm"
+        style={{ left: checked ? 18 : 2 }}
+      />
+    </button>
+  );
+}
+
 export function Field({
   label,
   children,

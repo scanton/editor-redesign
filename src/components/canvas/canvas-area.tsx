@@ -7,6 +7,7 @@ import { EraserLayer } from "@/components/canvas/eraser-layer";
 import { RegionLayer } from "@/components/canvas/region-layer";
 import { CanvasTools } from "@/components/canvas/canvas-tools";
 import { EnvelopePreview } from "@/components/canvas/envelope-preview";
+import { SceneLayer } from "@/components/canvas/scene-layer";
 import { PlacementLayers } from "@/components/canvas/placement-layers";
 import { FaceSwitcher } from "@/components/canvas/face-switcher";
 import { springHeavy } from "@/lib/motion";
@@ -20,9 +21,13 @@ export function CanvasArea() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const face = useEditorStore((s) => s.face);
-  // The Envelope tool takes over the canvas — you're addressing the envelope,
-  // not editing the card.
-  const showEnvelope = useEditorStore((s) => s.activeTool === "envelope");
+  // The face switcher decides what the canvas shows; the envelope is a face of
+  // the digital card, not a takeover.
+  const showEnvelope = useEditorStore((s) => s.surface === "envelope");
+  // A digital card is never shown on editor grey — it ships inside a scene.
+  const showScene = useEditorStore(
+    (s) => s.cardType === "digital" && s.surface === "card",
+  );
   const setViewport = useEditorStore((s) => s.setViewport);
 
   useEffect(() => {
@@ -45,6 +50,8 @@ export function CanvasArea() {
         className="canvas-backdrop relative min-h-0 flex-1 overflow-hidden"
         style={{ perspective: 2000 }}
       >
+        {showScene && <SceneLayer />}
+
         {size.width > 0 && (
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -73,9 +80,11 @@ export function CanvasArea() {
       </div>
 
       <AnimatePresence>
+        {/* No marking up an envelope — but the switcher has to stay, or the
+            envelope face becomes a room with no door back to the card. */}
         {!showEnvelope && <CanvasTools key="tools" />}
-        {!showEnvelope && <FaceSwitcher key="faces" />}
       </AnimatePresence>
+      <FaceSwitcher />
     </div>
   );
 }

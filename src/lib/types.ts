@@ -7,8 +7,14 @@ export type ToolId =
   | "translations"
   | "longform"
   | "cardtype"
+  | "background"
   | "envelope"
+  | "reveal"
+  | "cover"
   | "review";
+
+/** The canvas shows one of these at a time. */
+export type Surface = "card" | "envelope";
 
 export type Step = 1 | 2 | 3;
 

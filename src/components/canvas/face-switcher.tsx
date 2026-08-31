@@ -12,6 +12,11 @@ export function FaceSwitcher() {
   const doc = useEditorStore((s) => s.doc);
   const face = useEditorStore((s) => s.face);
   const setFace = useEditorStore((s) => s.setFace);
+  const surface = useEditorStore((s) => s.surface);
+  const setSurface = useEditorStore((s) => s.setSurface);
+  const envelopeColour = useEditorStore((s) => s.digital.envelopeColour);
+  // Only the digital card has an envelope you can look at before it opens.
+  const hasEnvelopeFace = useEditorStore((s) => s.cardType === "digital");
 
   return (
     <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center pb-5">
@@ -24,12 +29,15 @@ export function FaceSwitcher() {
       >
         {ORDER.map((id) => {
           const f = doc.faces[id];
-          const isActive = face === id;
+          const isActive = surface === "card" && face === id;
           return (
             <motion.button
               key={id}
               type="button"
-              onClick={() => setFace(id)}
+              onClick={() => {
+                setSurface("card");
+                setFace(id);
+              }}
               whileHover={{ y: -4, scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               transition={springTight}
@@ -70,6 +78,51 @@ export function FaceSwitcher() {
             </motion.button>
           );
         })}
+
+        {hasEnvelopeFace && (
+          <motion.button
+            type="button"
+            onClick={() => setSurface("envelope")}
+            whileHover={{ y: -4, scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            transition={springTight}
+            className="flex flex-col items-center gap-1.5"
+          >
+            <span
+              className={cn(
+                "text-[11px] font-semibold transition-colors",
+                surface === "envelope" ? "text-ink" : "text-ink-faint",
+              )}
+            >
+              Envelope
+            </span>
+            <span className="relative block">
+              <span
+                className={cn(
+                  "block h-[62px] w-[74px] overflow-hidden rounded-[7px] ring-1 ring-black/10 transition-shadow",
+                  surface === "envelope" && "shadow-rail",
+                )}
+                style={{ backgroundColor: envelopeColour }}
+              >
+                <svg viewBox="0 0 74 62" className="h-full w-full">
+                  <path
+                    d="M0 0 L37 30 L74 0"
+                    fill="none"
+                    stroke="rgb(0 0 0 / 0.22)"
+                    strokeWidth="1.5"
+                  />
+                </svg>
+              </span>
+              {surface === "envelope" && (
+                <motion.span
+                  layoutId="face-active-ring"
+                  transition={springBouncy}
+                  className="pointer-events-none absolute -inset-[3px] rounded-[10px] ring-2 ring-brand-red"
+                />
+              )}
+            </span>
+          </motion.button>
+        )}
       </motion.div>
     </div>
   );

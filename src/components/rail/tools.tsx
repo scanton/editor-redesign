@@ -1,7 +1,10 @@
 import {
+  ImagePlay,
   Languages,
+  LayoutTemplate,
   Mail,
   PenLine,
+  Play,
   Receipt,
   ScrollText,
   Shapes,
@@ -61,10 +64,28 @@ export const TOOLS: ToolDef[] = [
     blurb: "Digital or printed — both stay saved.",
   },
   {
+    id: "background",
+    label: "Background",
+    icon: ImagePlay,
+    blurb: "The 3D scene behind the card.",
+  },
+  {
     id: "envelope",
     label: "Envelope",
     icon: Mail,
-    blurb: "Envelope color, liner, and the addresses on it.",
+    blurb: "Look, colour, liner, seal, stamp and flap.",
+  },
+  {
+    id: "reveal",
+    label: "Reveal",
+    icon: Play,
+    blurb: "How the card opens on their screen.",
+  },
+  {
+    id: "cover",
+    label: "Cover",
+    icon: LayoutTemplate,
+    blurb: "Read before the envelope opens.",
   },
   {
     id: "review",

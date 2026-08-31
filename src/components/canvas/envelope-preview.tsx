@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { fontCssVar } from "@/lib/fonts";
 import { springHeavy } from "@/lib/motion";
+import { findEnvelopeLook } from "@/lib/digital-card";
 import { useEditorStore } from "@/store/editor-store";
 
 /**
@@ -12,6 +13,11 @@ import { useEditorStore } from "@/store/editor-store";
 export function EnvelopePreview() {
   const envelope = useEditorStore((s) => s.envelope);
   const zoom = useEditorStore((s) => s.zoom);
+  const colour = useEditorStore((s) => s.digital.envelopeColour);
+  const look = useEditorStore((s) => findEnvelopeLook(s.digital.envelopeLook));
+  const isDigital = useEditorStore((s) => s.cardType === "digital");
+  const body = isDigital ? colour : "#ffffff";
+  const liner = isDigital ? (look?.liner ?? "#f1efe9") : "#f4f2ec";
   const font = fontCssVar(envelope.font);
 
   const width = 760 * Math.max(zoom, 0.3) * 1.6;
@@ -24,17 +30,21 @@ export function EnvelopePreview() {
           initial={{ opacity: 0, x: 40, y: -20, rotate: 2 }}
           animate={{ opacity: 1, x: 0, y: 0, rotate: 0 }}
           transition={{ ...springHeavy, delay: 0.06 }}
-          className="absolute right-0 top-0 aspect-[10/7] w-[72%] rounded-[4px] bg-white shadow-card"
+          className="absolute right-0 top-0 aspect-[10/7] w-[72%] rounded-[4px] shadow-card"
+          style={{ backgroundColor: body }}
         >
           <svg viewBox="0 0 100 70" className="h-full w-full" preserveAspectRatio="none">
             {envelope.flap === "euro" ? (
-              <path
-                d="M0 0 L50 42 L100 0"
-                fill="none"
-                stroke="#e4e6ec"
-                strokeWidth="0.6"
-                vectorEffect="non-scaling-stroke"
-              />
+              <>
+                <path d="M0 0 L50 42 L100 0 Z" fill={liner} />
+                <path
+                  d="M0 0 L50 42 L100 0"
+                  fill="none"
+                  stroke="rgb(0 0 0 / 0.14)"
+                  strokeWidth="0.6"
+                  vectorEffect="non-scaling-stroke"
+                />
+              </>
             ) : (
               <line
                 x1="0"
@@ -54,8 +64,8 @@ export function EnvelopePreview() {
           initial={{ opacity: 0, y: 32, scale: 0.96 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           transition={springHeavy}
-          className="absolute bottom-0 left-0 aspect-[10/7] w-[72%] rounded-[4px] bg-white p-[6%] shadow-card"
-          style={{ fontFamily: font }}
+          className="absolute bottom-0 left-0 aspect-[10/7] w-[72%] rounded-[4px] p-[6%] shadow-card"
+          style={{ fontFamily: font, backgroundColor: body }}
         >
           <address className="not-italic leading-snug text-ink">
             <span className="block text-[0.9em]">{envelope.sender.name}</span>

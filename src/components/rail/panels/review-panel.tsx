@@ -10,6 +10,12 @@ import {
 } from "@/components/rail/panels/parts";
 import { springTight, staggerParent } from "@/lib/motion";
 import { findStyle } from "@/lib/art-styles";
+import {
+  REVEAL_PRESETS,
+  findBackground,
+  findEnvelopeLook,
+  findRevealStep,
+} from "@/lib/digital-card";
 import { findLanguage } from "@/lib/languages";
 import { findLongForm } from "@/lib/long-form";
 import { priceOf } from "@/lib/pricing";
@@ -24,6 +30,7 @@ export function ReviewPanel() {
   const language = useEditorStore((s) => s.targetLanguage);
   const longForm = useEditorStore((s) => s.longForm);
   const envelope = useEditorStore((s) => s.envelope);
+  const digital = useEditorStore((s) => s.digital);
   const setStep = useEditorStore((s) => s.setStep);
   const setTool = useEditorStore((s) => s.setTool);
   const warnings = useWarnings();
@@ -53,13 +60,42 @@ export function ReviewPanel() {
       findLanguage(language)?.name ?? "English (unchanged)",
     ],
     ["Personalize", "Card type", type.label],
-    [
-      "Personalize",
-      "Envelope",
-      `${envelope.flap === "euro" ? "Euro flap" : "Square flap"} · ${envelope.font}`,
-    ],
-    ["Personalize", "Mailing to", envelope.recipient.name || "Not addressed"],
   ];
+
+  if (cardType === "digital") {
+    const preset = REVEAL_PRESETS.find((p) => p.id === digital.reveal.preset);
+    const playing = digital.reveal.sequence.filter(
+      (id) => !digital.reveal.skipped.includes(id),
+    );
+    const runtime = playing.reduce((n, id) => n + findRevealStep(id).seconds, 0);
+    rows.push(
+      ["Personalize", "Scene", findBackground(digital.background).label],
+      [
+        "Personalize",
+        "Envelope",
+        findEnvelopeLook(digital.envelopeLook)?.label ?? "Custom set",
+      ],
+      [
+        "Personalize",
+        "Reveal",
+        `${preset?.label ?? "Fixed animation"} · ${runtime.toFixed(1)}s`,
+      ],
+      [
+        "Personalize",
+        "Cover",
+        digital.cover.on ? "Sealed until opened" : "Peek of the card",
+      ],
+    );
+  } else {
+    rows.push(
+      [
+        "Personalize",
+        "Envelope",
+        `${envelope.flap === "euro" ? "Euro flap" : "Square flap"} · ${envelope.font}`,
+      ],
+      ["Personalize", "Mailing to", envelope.recipient.name || "Not addressed"],
+    );
+  }
 
   const groups = ["Create", "Personalize"] as const;
 

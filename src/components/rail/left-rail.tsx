@@ -2,7 +2,7 @@
 
 import { motion } from "motion/react";
 import { toolsForStep } from "@/components/rail/tools";
-import { STEPS, STEP_TOOLS } from "@/lib/steps";
+import { STEPS, stepTools } from "@/lib/steps";
 import { springBouncy, springTight } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
 import { cn } from "@/lib/utils";
@@ -13,7 +13,7 @@ export function LeftRail() {
   const step = useEditorStore((s) => s.step);
   const cardType = useEditorStore((s) => s.cardType);
 
-  const tools = toolsForStep(STEP_TOOLS[step]);
+  const tools = toolsForStep(stepTools(step, cardType));
   // The group is named for what you are doing, and Personalize says which
   // rendition you are dressing.
   const groupLabel =
