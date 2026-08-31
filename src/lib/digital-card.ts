@@ -17,11 +17,11 @@ import {
  * described by their parameters rather than picked from a fixed list; video and
  * stills come from the asset library.
  */
-export type BackgroundKind = "Gradient" | "3D Animation" | "Video BG" | "Stills";
+export type BackgroundKind = "Gradient" | "Animation" | "Video BG" | "Stills";
 
 export type Scene =
   | { kind: "Gradient"; styleId: string; paletteId: string; speed: number }
-  | { kind: "3D Animation"; themeId: string; effectId: string | null; speed: number }
+  | { kind: "Animation"; themeId: string; effectId: string | null; speed: number }
   | { kind: "Video BG" | "Stills"; id: string };
 
 /**
@@ -53,7 +53,7 @@ export const ASSET_SCENES: {
 export const BACKGROUND_TABS: ("All" | BackgroundKind)[] = [
   "All",
   "Gradient",
-  "3D Animation",
+  "Animation",
   "Video BG",
   "Stills",
 ];
@@ -83,7 +83,7 @@ export function describeScene(scene: Scene): string {
     const palette = PALETTES.find((p) => p.id === scene.paletteId);
     return `${style?.name ?? "Gradient"} · ${palette?.name ?? ""}`;
   }
-  if (scene.kind === "3D Animation") {
+  if (scene.kind === "Animation") {
     return (
       matchPreset(scene.themeId, scene.effectId)?.label ??
       describeTheme(scene.themeId, scene.effectId)

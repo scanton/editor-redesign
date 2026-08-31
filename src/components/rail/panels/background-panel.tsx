@@ -5,6 +5,7 @@ import { Check, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { GradientBackground } from "@/components/canvas/gradient-background";
 import { PanelBody, Section, inputClass } from "@/components/rail/panels/parts";
+import { PeekCarousel } from "@/components/ui/peek-carousel";
 import { springBouncy, springTight, staggerParent } from "@/lib/motion";
 import {
   ASSET_SCENES,
@@ -72,12 +73,12 @@ export function BackgroundPanel() {
     scene.kind === "Gradient" ? scene.paletteId : PALETTES[3].id;
   const gradientSpeed = scene.kind === "Gradient" ? scene.speed : 12;
 
-  const themeId = scene.kind === "3D Animation" ? scene.themeId : DEFAULT_THEME;
+  const themeId = scene.kind === "Animation" ? scene.themeId : DEFAULT_THEME;
   const effectId =
-    scene.kind === "3D Animation" ? scene.effectId : DEFAULT_EFFECT;
-  const themeSpeed = scene.kind === "3D Animation" ? scene.speed : 60;
+    scene.kind === "Animation" ? scene.effectId : DEFAULT_EFFECT;
+  const themeSpeed = scene.kind === "Animation" ? scene.speed : 60;
   const activePreset =
-    scene.kind === "3D Animation" ? matchPreset(themeId, effectId) : null;
+    scene.kind === "Animation" ? matchPreset(themeId, effectId) : null;
 
   return (
     <PanelBody>
@@ -125,33 +126,35 @@ export function BackgroundPanel() {
         {/* ── Gradient ─────────────────────────────────────────────────── */}
         {(listed("Gradient") || hits?.styles.length) && (
           <Section title="Gradient · style" action={<Count n={SCENE_COUNTS.gradient} />}>
-            <div className="grid grid-cols-3 gap-2.5">
-              {(hits?.styles ?? GRADIENT_STYLES).map((style) => (
-                <Tile
-                  key={style.id}
-                  label={style.name}
-                  title={style.description}
-                  on={scene.kind === "Gradient" && scene.styleId === style.id}
-                  onPick={() =>
-                    setScene({
-                      kind: "Gradient",
-                      styleId: style.id,
-                      paletteId: gradientPalette,
-                      speed: gradientSpeed,
-                    })
+            <PeekCarousel
+              label="Gradient style"
+              items={(hits?.styles ?? GRADIENT_STYLES).map((g) => ({
+                id: g.id,
+                label: g.name,
+                sub: g.description,
+              }))}
+              selectedId={scene.kind === "Gradient" ? scene.styleId : null}
+              onSelect={(id) =>
+                setScene({
+                  kind: "Gradient",
+                  styleId: id,
+                  paletteId: gradientPalette,
+                  speed: gradientSpeed,
+                })
+              }
+              renderItem={(item) => (
+                // The slide is the real renderer, so the carousel previews the
+                // scene rather than a picture of it.
+                <GradientBackground
+                  styleId={item.id}
+                  palette={
+                    PALETTES.find((p) => p.id === gradientPalette) ?? PALETTES[0]
                   }
-                >
-                  <GradientBackground
-                    styleId={style.id}
-                    palette={
-                      PALETTES.find((p) => p.id === gradientPalette) ?? PALETTES[0]
-                    }
-                    maxDimension={140}
-                    speed={Math.min(gradientSpeed, 20)}
-                  />
-                </Tile>
-              ))}
-            </div>
+                  maxDimension={220}
+                  speed={Math.min(gradientSpeed, 20)}
+                />
+              )}
+            />
           </Section>
         )}
 
@@ -219,39 +222,47 @@ export function BackgroundPanel() {
         )}
 
         {/* ── Animated themes ──────────────────────────────────────────── */}
-        {(listed("3D Animation") || hits?.presets.length) && (
+        {(listed("Animation") || hits?.presets.length) && (
           <Section
-            title="3D Animation · presets"
+            title="Animation · presets"
             action={<Count n={SCENE_COUNTS.themes} />}
           >
-            <div className="grid grid-cols-2 gap-2.5">
-              {(hits?.presets ?? THEME_PRESETS).map((preset) => (
-                <Tile
-                  key={preset.id}
-                  label={preset.label}
-                  sub={describeTheme(preset.themeId, preset.effectId)}
-                  on={activePreset?.id === preset.id}
-                  wide
-                  onPick={() =>
-                    setScene({
-                      kind: "3D Animation",
-                      themeId: preset.themeId,
-                      effectId: preset.effectId,
-                      speed: themeSpeed,
-                    })
-                  }
-                >
+            <PeekCarousel
+              label="Animation preset"
+              items={(hits?.presets ?? THEME_PRESETS).map((p) => ({
+                id: p.id,
+                label: p.label,
+                sub: describeTheme(p.themeId, p.effectId),
+              }))}
+              selectedId={activePreset?.id ?? null}
+              onSelect={(id) => {
+                const preset = THEME_PRESETS.find((p) => p.id === id);
+                if (!preset) return;
+                setScene({
+                  kind: "Animation",
+                  themeId: preset.themeId,
+                  effectId: preset.effectId,
+                  speed: themeSpeed,
+                });
+              }}
+              renderItem={(item) => {
+                const preset = THEME_PRESETS.find((p) => p.id === item.id);
+                return (
                   <span
                     className="absolute inset-0"
-                    style={{ backgroundImage: themeTint(preset.themeId) }}
+                    style={{
+                      backgroundImage: themeTint(
+                        preset?.themeId ?? THEME_PRESETS[0].themeId,
+                      ),
+                    }}
                   />
-                </Tile>
-              ))}
-            </div>
+                );
+              }}
+            />
           </Section>
         )}
 
-        {showing("3D Animation") && (
+        {showing("Animation") && (
           <>
             <Section
               title="Theme"
@@ -270,7 +281,7 @@ export function BackgroundPanel() {
                 activeId={themeId}
                 onPick={(id) =>
                   setScene({
-                    kind: "3D Animation",
+                    kind: "Animation",
                     themeId: id,
                     effectId,
                     speed: themeSpeed,
@@ -288,7 +299,7 @@ export function BackgroundPanel() {
                 activeId={effectId ?? "__none"}
                 onPick={(id) =>
                   setScene({
-                    kind: "3D Animation",
+                    kind: "Animation",
                     themeId,
                     effectId: id === "__none" ? null : id,
                     speed: themeSpeed,
@@ -300,7 +311,7 @@ export function BackgroundPanel() {
             <SpeedControl
               value={themeSpeed}
               onChange={(speed) =>
-                setScene({ kind: "3D Animation", themeId, effectId, speed })
+                setScene({ kind: "Animation", themeId, effectId, speed })
               }
             />
           </>

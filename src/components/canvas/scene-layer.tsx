@@ -54,7 +54,7 @@ export function SceneLayer() {
         />
       )}
 
-      {scene.kind === "3D Animation" && (
+      {scene.kind === "Animation" && (
         <ThemeScene
           themeId={scene.themeId}
           effectId={scene.effectId}
