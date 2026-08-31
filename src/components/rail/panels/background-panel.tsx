@@ -15,15 +15,28 @@ import {
 } from "@/lib/digital-card";
 import { GRADIENT_STYLES } from "@/lib/gradient-styles";
 import { PALETTES } from "@/lib/gradient-palettes";
-import { THEMES, themeTint } from "@/lib/themes";
+import {
+  THEME_EFFECTS,
+  THEME_PRESETS,
+  THEME_VARIATIONS,
+  describeTheme,
+  matchPreset,
+  themeTint,
+} from "@/lib/themes";
 import { useEditorStore } from "@/store/editor-store";
 import { cn } from "@/lib/utils";
 
+const DEFAULT_THEME = "tie-dye";
+const DEFAULT_EFFECT = "butterflies";
+
 /**
- * The scene behind the card. Four kinds, and two of them are generated rather
- * than picked from a list: a gradient is a style crossed with a palette, and a
- * theme is a background crossed with an effect. Those get their own controls
- * instead of pretending to be a flat grid of hundreds of thumbnails.
+ * The scene behind the card. Two of the four kinds are generated rather than
+ * listed — a gradient is a style crossed with a palette, an animated scene is a
+ * theme crossed with an effect — so each gets a small set of controls instead of
+ * a grid of hundreds of thumbnails.
+ *
+ * Those controls only appear when their kind is in play, so the panel is short
+ * unless you are actually working in it.
  */
 export function BackgroundPanel() {
   const scene = useEditorStore((s) => s.digital.scene);
@@ -32,21 +45,22 @@ export function BackgroundPanel() {
   const [query, setQuery] = useState("");
 
   const setScene = (next: Scene) => setDigital({ scene: next });
-
   const q = query.trim().toLowerCase();
-  const show = (kind: string) =>
-    !q && (tab === "All" || tab === kind);
 
-  const searchHits = useMemo(() => {
+  /** A kind's controls show when it is the active scene or the chosen tab. */
+  const showing = (kind: string) =>
+    !q && (tab === kind || (tab === "All" && scene.kind === kind));
+  /** Its picker always shows under All, so a kind can be reached. */
+  const listed = (kind: string) => !q && (tab === "All" || tab === kind);
+
+  const hits = useMemo(() => {
     if (!q) return null;
     return {
       styles: GRADIENT_STYLES.filter((s) => s.name.toLowerCase().includes(q)),
-      palettes: PALETTES.filter((p) => p.name.toLowerCase().includes(q)),
-      themes: THEMES.filter(
-        (t) =>
-          t.label.toLowerCase().includes(q) ||
-          t.theme.toLowerCase().includes(q) ||
-          t.effect.toLowerCase().includes(q),
+      presets: THEME_PRESETS.filter(
+        (p) =>
+          p.label.toLowerCase().includes(q) ||
+          describeTheme(p.themeId, p.effectId).toLowerCase().includes(q),
       ),
       assets: ASSET_SCENES.filter((a) => a.label.toLowerCase().includes(q)),
     };
@@ -55,7 +69,15 @@ export function BackgroundPanel() {
   const gradientStyle =
     scene.kind === "Gradient" ? scene.styleId : GRADIENT_STYLES[0].id;
   const gradientPalette =
-    scene.kind === "Gradient" ? scene.paletteId : PALETTES[0].id;
+    scene.kind === "Gradient" ? scene.paletteId : PALETTES[3].id;
+  const gradientSpeed = scene.kind === "Gradient" ? scene.speed : 12;
+
+  const themeId = scene.kind === "3D Animation" ? scene.themeId : DEFAULT_THEME;
+  const effectId =
+    scene.kind === "3D Animation" ? scene.effectId : DEFAULT_EFFECT;
+  const themeSpeed = scene.kind === "3D Animation" ? scene.speed : 60;
+  const activePreset =
+    scene.kind === "3D Animation" ? matchPreset(themeId, effectId) : null;
 
   return (
     <PanelBody>
@@ -100,142 +122,194 @@ export function BackgroundPanel() {
           </Section>
         )}
 
-        {/* ── Gradients: a style crossed with a palette ────────────────── */}
-        {(show("Gradient") || searchHits?.styles.length) && (
-          <Section
-            title="Gradient · style"
-            action={<Count n={GRADIENT_STYLES.length} />}
-          >
+        {/* ── Gradient ─────────────────────────────────────────────────── */}
+        {(listed("Gradient") || hits?.styles.length) && (
+          <Section title="Gradient · style" action={<Count n={SCENE_COUNTS.gradient} />}>
             <div className="grid grid-cols-3 gap-2.5">
-              {(searchHits?.styles ?? GRADIENT_STYLES).map((style) => {
-                const on =
-                  scene.kind === "Gradient" && scene.styleId === style.id;
-                return (
-                  <Tile
-                    key={style.id}
-                    label={style.name}
-                    on={on}
-                    title={style.description}
-                    onPick={() =>
-                      setScene({
-                        kind: "Gradient",
-                        styleId: style.id,
-                        paletteId: gradientPalette,
-                      })
+              {(hits?.styles ?? GRADIENT_STYLES).map((style) => (
+                <Tile
+                  key={style.id}
+                  label={style.name}
+                  title={style.description}
+                  on={scene.kind === "Gradient" && scene.styleId === style.id}
+                  onPick={() =>
+                    setScene({
+                      kind: "Gradient",
+                      styleId: style.id,
+                      paletteId: gradientPalette,
+                      speed: gradientSpeed,
+                    })
+                  }
+                >
+                  <GradientBackground
+                    styleId={style.id}
+                    palette={
+                      PALETTES.find((p) => p.id === gradientPalette) ?? PALETTES[0]
                     }
-                  >
-                    {/* Real thing, not a stand-in — the same renderer the card sits on. */}
-                    <GradientBackground
-                      styleId={style.id}
-                      palette={
-                        PALETTES.find((p) => p.id === gradientPalette) ??
-                        PALETTES[0]
+                    maxDimension={140}
+                    speed={Math.min(gradientSpeed, 20)}
+                  />
+                </Tile>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {showing("Gradient") && (
+          <>
+            <Section title="Palette" action={<Count n={PALETTES.length} />}>
+              <div className="grid grid-cols-4 gap-2">
+                {PALETTES.map((palette) => {
+                  const on =
+                    scene.kind === "Gradient" && scene.paletteId === palette.id;
+                  return (
+                    <motion.button
+                      key={palette.id}
+                      type="button"
+                      title={palette.name}
+                      onClick={() =>
+                        setScene({
+                          kind: "Gradient",
+                          styleId: gradientStyle,
+                          paletteId: palette.id,
+                          speed: gradientSpeed,
+                        })
                       }
-                      maxDimension={140}
-                      speed={8}
-                    />
-                  </Tile>
-                );
-              })}
-            </div>
-          </Section>
+                      whileHover={{ scale: 1.06, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={springTight}
+                      className="text-left"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-7 overflow-hidden rounded-[7px] ring-2",
+                          on ? "ring-ink" : "ring-transparent hover:ring-hairline-strong",
+                        )}
+                      >
+                        {palette.colors.map((c) => (
+                          <span key={c} className="flex-1" style={{ backgroundColor: c }} />
+                        ))}
+                      </span>
+                      <span
+                        className={cn(
+                          "mt-1 block truncate text-[10.5px] leading-tight",
+                          on ? "font-semibold text-ink" : "text-ink-faint",
+                        )}
+                      >
+                        {palette.name}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </Section>
+
+            <SpeedControl
+              value={gradientSpeed}
+              onChange={(speed) =>
+                setScene({
+                  kind: "Gradient",
+                  styleId: gradientStyle,
+                  paletteId: gradientPalette,
+                  speed,
+                })
+              }
+            />
+          </>
         )}
 
-        {(show("Gradient") || searchHits?.palettes.length) && (
+        {/* ── Animated themes ──────────────────────────────────────────── */}
+        {(listed("3D Animation") || hits?.presets.length) && (
           <Section
-            title="Gradient · palette"
-            action={<Count n={PALETTES.length} />}
-          >
-            <div className="grid grid-cols-4 gap-2">
-              {(searchHits?.palettes ?? PALETTES).map((palette) => {
-                const on =
-                  scene.kind === "Gradient" && scene.paletteId === palette.id;
-                return (
-                  <motion.button
-                    key={palette.id}
-                    type="button"
-                    title={palette.name}
-                    onClick={() =>
-                      setScene({
-                        kind: "Gradient",
-                        styleId: gradientStyle,
-                        paletteId: palette.id,
-                      })
-                    }
-                    whileHover={{ scale: 1.06, y: -2 }}
-                    whileTap={{ scale: 0.95 }}
-                    transition={springTight}
-                    className="text-left"
-                  >
-                    <span
-                      className={cn(
-                        "flex h-7 overflow-hidden rounded-[7px] ring-2",
-                        on
-                          ? "ring-ink"
-                          : "ring-transparent hover:ring-hairline-strong",
-                      )}
-                    >
-                      {palette.colors.map((c) => (
-                        <span
-                          key={c}
-                          className="flex-1"
-                          style={{ backgroundColor: c }}
-                        />
-                      ))}
-                    </span>
-                    <span
-                      className={cn(
-                        "mt-1 block truncate text-[10.5px] leading-tight",
-                        on ? "font-semibold text-ink" : "text-ink-faint",
-                      )}
-                    >
-                      {palette.name}
-                    </span>
-                  </motion.button>
-                );
-              })}
-            </div>
-          </Section>
-        )}
-
-        {/* ── Themes: a background crossed with an effect ──────────────── */}
-        {(show("3D Animation") || searchHits?.themes.length) && (
-          <Section
-            title="3D Animation · theme × effect"
+            title="3D Animation · presets"
             action={<Count n={SCENE_COUNTS.themes} />}
           >
             <div className="grid grid-cols-2 gap-2.5">
-              {(searchHits?.themes ?? THEMES).map((theme) => {
-                const on =
-                  scene.kind === "3D Animation" && scene.themeId === theme.id;
-                return (
-                  <Tile
-                    key={theme.id}
-                    label={theme.label}
-                    sub={`${theme.theme} + ${theme.effect}`}
-                    on={on}
-                    wide
-                    onPick={() =>
-                      setScene({ kind: "3D Animation", themeId: theme.id })
-                    }
-                  >
-                    <span
-                      className="absolute inset-0"
-                      style={{ backgroundImage: themeTint(theme) }}
-                    />
-                  </Tile>
-                );
-              })}
+              {(hits?.presets ?? THEME_PRESETS).map((preset) => (
+                <Tile
+                  key={preset.id}
+                  label={preset.label}
+                  sub={describeTheme(preset.themeId, preset.effectId)}
+                  on={activePreset?.id === preset.id}
+                  wide
+                  onPick={() =>
+                    setScene({
+                      kind: "3D Animation",
+                      themeId: preset.themeId,
+                      effectId: preset.effectId,
+                      speed: themeSpeed,
+                    })
+                  }
+                >
+                  <span
+                    className="absolute inset-0"
+                    style={{ backgroundImage: themeTint(preset.themeId) }}
+                  />
+                </Tile>
+              ))}
             </div>
           </Section>
         )}
 
+        {showing("3D Animation") && (
+          <>
+            <Section
+              title="Theme"
+              action={
+                <span className="text-[11.5px] font-medium text-brand-red">
+                  {activePreset ? activePreset.label : "Custom"}
+                </span>
+              }
+            >
+              <p className="mb-2.5 text-[12px] leading-snug text-ink-faint">
+                {describeTheme(themeId, effectId)} — mix any theme with any
+                effect, or start from a preset above.
+              </p>
+              <PillGrid
+                items={THEME_VARIATIONS.map((v) => ({ id: v.id, label: v.label }))}
+                activeId={themeId}
+                onPick={(id) =>
+                  setScene({
+                    kind: "3D Animation",
+                    themeId: id,
+                    effectId,
+                    speed: themeSpeed,
+                  })
+                }
+              />
+            </Section>
+
+            <Section title="Effect" action={<Count n={THEME_EFFECTS.length + 1} />}>
+              <PillGrid
+                items={[
+                  { id: "__none", label: "None" },
+                  ...THEME_EFFECTS.map((e) => ({ id: e.id, label: e.label })),
+                ]}
+                activeId={effectId ?? "__none"}
+                onPick={(id) =>
+                  setScene({
+                    kind: "3D Animation",
+                    themeId,
+                    effectId: id === "__none" ? null : id,
+                    speed: themeSpeed,
+                  })
+                }
+              />
+            </Section>
+
+            <SpeedControl
+              value={themeSpeed}
+              onChange={(speed) =>
+                setScene({ kind: "3D Animation", themeId, effectId, speed })
+              }
+            />
+          </>
+        )}
+
         {/* ── Flat assets ──────────────────────────────────────────────── */}
-        {["Video BG", "Stills"].map((kind) => {
-          const items = (searchHits?.assets ?? ASSET_SCENES).filter(
-            (a) => a.kind === kind,
-          );
-          if (!items.length || (!q && !show(kind))) return null;
+        {(["Video BG", "Stills"] as const).map((kind) => {
+          const items = (hits?.assets ?? ASSET_SCENES).filter((a) => a.kind === kind);
+          if (!items.length || (!q && !listed(kind))) return null;
           return (
             <Section
               key={kind}
@@ -247,32 +321,25 @@ export function BackgroundPanel() {
               }
             >
               <div className="grid grid-cols-2 gap-2.5">
-                {items.map((asset) => {
-                  const on =
-                    (scene.kind === "Video BG" || scene.kind === "Stills") &&
-                    scene.id === asset.id;
-                  return (
-                    <Tile
-                      key={asset.id}
-                      label={asset.label}
-                      on={on}
-                      wide
-                      onPick={() =>
-                        setScene({
-                          kind: asset.kind,
-                          id: asset.id,
-                        })
-                      }
-                    >
-                      <span
-                        className="absolute inset-0"
-                        style={{
-                          backgroundImage: `linear-gradient(145deg, ${asset.gradient})`,
-                        }}
-                      />
-                    </Tile>
-                  );
-                })}
+                {items.map((asset) => (
+                  <Tile
+                    key={asset.id}
+                    label={asset.label}
+                    on={
+                      (scene.kind === "Video BG" || scene.kind === "Stills") &&
+                      scene.id === asset.id
+                    }
+                    wide
+                    onPick={() => setScene({ kind: asset.kind, id: asset.id })}
+                  >
+                    <span
+                      className="absolute inset-0"
+                      style={{
+                        backgroundImage: `linear-gradient(145deg, ${asset.gradient})`,
+                      }}
+                    />
+                  </Tile>
+                ))}
               </div>
             </Section>
           );
@@ -287,6 +354,78 @@ export function BackgroundPanel() {
         </Section>
       </motion.div>
     </PanelBody>
+  );
+}
+
+/** 0 stops the motion entirely; the label says so rather than reading "0%". */
+function SpeedControl({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <Section
+      title="Motion"
+      action={
+        <span className="text-[11.5px] tabular-nums text-ink-faint">
+          {value === 0 ? "Still" : `${value}%`}
+        </span>
+      }
+    >
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        aria-label="Motion speed"
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-brand-red"
+      />
+      <p className="mt-1.5 text-[12px] text-ink-faint">
+        Drag to nothing for a still scene. Reduced-motion settings are always
+        respected regardless.
+      </p>
+    </Section>
+  );
+}
+
+function PillGrid({
+  items,
+  activeId,
+  onPick,
+}: {
+  items: { id: string; label: string }[];
+  activeId: string;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <div className="scroll-slim -mx-1 max-h-[176px] overflow-y-auto px-1">
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => {
+          const on = item.id === activeId;
+          return (
+            <motion.button
+              key={item.id}
+              type="button"
+              onClick={() => onPick(item.id)}
+              whileHover={{ scale: 1.04, y: -1 }}
+              whileTap={{ scale: 0.95 }}
+              transition={springTight}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors",
+                on
+                  ? "border-transparent bg-ink text-white"
+                  : "border-hairline text-ink-soft hover:border-hairline-strong hover:text-ink",
+              )}
+            >
+              {item.label}
+            </motion.button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
 
@@ -348,9 +487,7 @@ function Tile({
         )}
       </span>
       {sub && (
-        <span className="mt-1 block truncate text-[10.5px] text-ink-faint">
-          {sub}
-        </span>
+        <span className="mt-1 block truncate text-[10.5px] text-ink-faint">{sub}</span>
       )}
     </motion.button>
   );

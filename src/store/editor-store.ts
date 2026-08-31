@@ -250,7 +250,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSurface: (surface) => set({ surface }),
 
   digital: {
-    scene: { kind: "Gradient", styleId: "aurora", paletteId: "northern-lights" },
+    scene: {
+      kind: "Gradient",
+      styleId: "aurora",
+      paletteId: "northern-lights",
+      speed: 12,
+    },
     backgroundTab: "All",
     envelopeLook: "m1",
     envelopeColour: "#f5bdc2",

@@ -1,6 +1,10 @@
 import { GRADIENT_STYLES } from "./gradient-styles";
 import { PALETTES } from "./gradient-palettes";
-import { EFFECT_COUNT, THEME_COUNT, findTheme } from "./themes";
+import {
+  THEME_COMBINATIONS,
+  describeTheme,
+  matchPreset,
+} from "./themes";
 
 /**
  * The digital card's presentation layer: the scene it sits in, the envelope it
@@ -16,11 +20,14 @@ import { EFFECT_COUNT, THEME_COUNT, findTheme } from "./themes";
 export type BackgroundKind = "Gradient" | "3D Animation" | "Video BG" | "Stills";
 
 export type Scene =
-  | { kind: "Gradient"; styleId: string; paletteId: string }
-  | { kind: "3D Animation"; themeId: string }
+  | { kind: "Gradient"; styleId: string; paletteId: string; speed: number }
+  | { kind: "3D Animation"; themeId: string; effectId: string | null; speed: number }
   | { kind: "Video BG" | "Stills"; id: string };
 
-/** Video and still scenes, which are flat assets rather than generated. */
+/**
+ * Video and stills are flat assets rather than generated scenes. These are the
+ * ones the current library ships.
+ */
 export const ASSET_SCENES: {
   id: string;
   label: string;
@@ -39,18 +46,8 @@ export const ASSET_SCENES: {
     kind: "Video BG",
     gradient: "#1f3fd8, #7fb2e5",
   },
-  {
-    id: "holiday-still",
-    label: "Holiday",
-    kind: "Stills",
-    gradient: "#1a1030, #c9a227",
-  },
-  {
-    id: "autumn-still",
-    label: "Autumn",
-    kind: "Stills",
-    gradient: "#b2451d, #e8a33d",
-  },
+  { id: "holiday", label: "Holiday", kind: "Stills", gradient: "#1a1030, #c9a227" },
+  { id: "autumn", label: "Autumn", kind: "Stills", gradient: "#b2451d, #e8a33d" },
 ];
 
 export const BACKGROUND_TABS: ("All" | BackgroundKind)[] = [
@@ -61,12 +58,12 @@ export const BACKGROUND_TABS: ("All" | BackgroundKind)[] = [
   "Stills",
 ];
 
-/** What the library holds in production, per kind. */
 export const SCENE_COUNTS = {
   gradient: GRADIENT_STYLES.length * PALETTES.length,
-  themes: THEME_COUNT * EFFECT_COUNT,
+  themes: THEME_COMBINATIONS,
+  /** The video library is larger than what the panel lists. */
   video: 450,
-  stills: 120,
+  stills: ASSET_SCENES.filter((s) => s.kind === "Stills").length,
 };
 
 export const TOTAL_BACKGROUNDS =
@@ -87,13 +84,12 @@ export function describeScene(scene: Scene): string {
     return `${style?.name ?? "Gradient"} · ${palette?.name ?? ""}`;
   }
   if (scene.kind === "3D Animation") {
-    return findTheme(scene.themeId)?.label ?? "Animated theme";
+    return (
+      matchPreset(scene.themeId, scene.effectId)?.label ??
+      describeTheme(scene.themeId, scene.effectId)
+    );
   }
   return findAssetScene(scene.id).label;
-}
-
-export function sceneKindLabel(scene: Scene) {
-  return scene.kind;
 }
 
 /* ─────────────────────────────────────────────── envelope looks ── */
