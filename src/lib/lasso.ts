@@ -58,3 +58,48 @@ export function rectToSvgPoints(
     t,
   );
 }
+
+/** Ray-casting hit test. Points are a flat [x0, y0, …] polygon. */
+export function pointInPolygon(
+  x: number,
+  y: number,
+  points: number[],
+): boolean {
+  let inside = false;
+  const n = points.length / 2;
+  for (let i = 0, j = n - 1; i < n; j = i++) {
+    const xi = points[i * 2];
+    const yi = points[i * 2 + 1];
+    const xj = points[j * 2];
+    const yj = points[j * 2 + 1];
+    if (yi > y !== yj > y && x < ((xj - xi) * (y - yi)) / (yj - yi) + xi) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+/** Polygon helpers for hand-authoring stand-in segments. */
+export function ellipsePoly(
+  cx: number,
+  cy: number,
+  rx: number,
+  ry: number,
+  steps = 28,
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < steps; i++) {
+    const a = (i / steps) * Math.PI * 2;
+    out.push(cx + Math.cos(a) * rx, cy + Math.sin(a) * ry);
+  }
+  return out;
+}
+
+export function rectPoly(
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+): number[] {
+  return [x, y, x + w, y, x + w, y + h, x, y + h];
+}

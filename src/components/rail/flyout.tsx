@@ -4,10 +4,18 @@ import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { TOOLS } from "@/components/rail/tools";
+import { BackgroundPanel } from "@/components/rail/panels/background-panel";
+import { CardTypePanel } from "@/components/rail/panels/card-type-panel";
+import { DeliveryPanel } from "@/components/rail/panels/delivery-panel";
+import { PrintOptionsPanel } from "@/components/rail/panels/print-options-panel";
+import { RecipientsPanel } from "@/components/rail/panels/recipients-panel";
+import { CoverPanel } from "@/components/rail/panels/cover-panel";
 import { EnvelopePanel } from "@/components/rail/panels/envelope-panel";
 import { LongFormPanel } from "@/components/rail/panels/long-form-panel";
 import { MessagePanel } from "@/components/rail/panels/message-panel";
 import { SignaturePanel } from "@/components/rail/panels/signature-panel";
+import { RevealPanel } from "@/components/rail/panels/reveal-panel";
+import { ReviewPanel } from "@/components/rail/panels/review-panel";
 import { StylesPanel } from "@/components/rail/panels/styles-panel";
 import { TranslationsPanel } from "@/components/rail/panels/translations-panel";
 import { bounceOut, flyoutClose } from "@/lib/motion";
@@ -21,7 +29,15 @@ const PANELS: Record<ToolId, React.ComponentType> = {
   signature: SignaturePanel,
   translations: TranslationsPanel,
   longform: LongFormPanel,
+  cardtype: CardTypePanel,
+  background: BackgroundPanel,
   envelope: EnvelopePanel,
+  reveal: RevealPanel,
+  cover: CoverPanel,
+  delivery: DeliveryPanel,
+  recipients: RecipientsPanel,
+  printopts: PrintOptionsPanel,
+  review: ReviewPanel,
 };
 
 /**

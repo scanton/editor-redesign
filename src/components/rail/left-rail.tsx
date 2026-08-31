@@ -1,7 +1,8 @@
 "use client";
 
 import { motion } from "motion/react";
-import { TOOLS } from "@/components/rail/tools";
+import { toolsForStep } from "@/components/rail/tools";
+import { STEPS, stepTools } from "@/lib/steps";
 import { springBouncy, springTight } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
 import { cn } from "@/lib/utils";
@@ -9,13 +10,29 @@ import { cn } from "@/lib/utils";
 export function LeftRail() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const toggleTool = useEditorStore((s) => s.toggleTool);
+  const step = useEditorStore((s) => s.step);
+  const cardType = useEditorStore((s) => s.cardType);
+
+  const tools = toolsForStep(stepTools(step, cardType));
+  // The group is named for what you are doing, and Personalize says which
+  // rendition you are dressing.
+  const groupLabel =
+    step === 2
+      ? cardType === "digital"
+        ? "Digital card"
+        : "Printed card"
+      : STEPS.find((s) => s.id === step)!.label;
 
   return (
     <nav
       aria-label="Editor tools"
       className="relative z-20 flex w-[var(--rail-width)] shrink-0 flex-col items-center gap-1 border-r border-hairline bg-surface pt-4"
     >
-      {TOOLS.map((tool, i) => {
+      <span className="mb-1 w-full px-2 text-center text-[10px] font-semibold uppercase tracking-[0.09em] text-ink-faint">
+        {groupLabel}
+      </span>
+
+      {tools.map((tool, i) => {
         const isActive = activeTool === tool.id;
         const Icon = tool.icon;
         return (

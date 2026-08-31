@@ -1,14 +1,24 @@
 "use client";
 
 import { motion } from "motion/react";
+import { Check, Sparkles } from "lucide-react";
 import {
   Divider,
   PanelBody,
+  Segmented,
   PanelFooter,
   PrimaryButton,
   Section,
   Select,
+  SwatchGrid,
 } from "@/components/rail/panels/parts";
+import {
+  ENVELOPE_COLOURS,
+  ENVELOPE_DECOR,
+  ENVELOPE_LOOK_ROWS,
+  findEnvelopeLook,
+  type EnvelopeDecorPart,
+} from "@/lib/digital-card";
 import { springBouncy, staggerParent } from "@/lib/motion";
 import { CARD_FONTS } from "@/lib/fonts";
 import type { Envelope } from "@/lib/types";
@@ -29,11 +39,226 @@ const FONT_OPTIONS = CARD_FONTS.map((f) => ({
 export function EnvelopePanel() {
   const envelope = useEditorStore((s) => s.envelope);
   const updateEnvelope = useEditorStore((s) => s.updateEnvelope);
+  const digital = useEditorStore((s) => s.digital);
+  const setDigital = useEditorStore((s) => s.setDigital);
+  const isDigital = useEditorStore((s) => s.cardType === "digital");
+
+  const look = findEnvelopeLook(digital.envelopeLook);
+
+  const selectedDecor = {
+    liner: digital.envelopeLiner,
+    stamp: digital.envelopeStamp,
+    seal: digital.envelopeSeal,
+  }[digital.envelopeDecorPart];
+
+  /** Changing one part keeps the rest, but moves you off the matched look. */
+  const pickDecor = (id: string) =>
+    setDigital({
+      envelopeLook: null,
+      ...(digital.envelopeDecorPart === "liner"
+        ? { envelopeLiner: id }
+        : digital.envelopeDecorPart === "stamp"
+          ? { envelopeStamp: id }
+          : { envelopeSeal: id }),
+    });
 
   return (
     <>
       <PanelBody>
         <motion.div variants={staggerParent} initial="hidden" animate="visible">
+          {isDigital && (
+            <>
+              <Section>
+                <p className="flex gap-2 rounded-[12px] bg-surface-sunken/70 p-3 text-[12px] leading-snug text-ink-faint">
+                  <Sparkles size={14} className="mt-0.5 shrink-0" />
+                  <span>
+                    The digital envelope opens before the card. Dress it as a
+                    matched set, or fine-tune every part below.
+                  </span>
+                </p>
+              </Section>
+
+              <Section
+                title="Envelope looks"
+                action={
+                  <span className="flex items-center gap-1.5 text-[12px] font-medium text-brand-red">
+                    <Check size={13} />
+                    {look?.label ?? "Custom"}
+                  </span>
+                }
+              >
+                <p className="mb-3 text-[12px] leading-snug text-ink-faint">
+                  One tap dresses the whole envelope — colour, liner, seal and
+                  stamp as a matched set.
+                </p>
+
+                {ENVELOPE_LOOK_ROWS.map((row) => (
+                  <div key={row.title} className="mb-4 last:mb-0">
+                    <h4 className="text-[13px] font-semibold text-ink">
+                      {row.title}
+                    </h4>
+                    <p className="mb-2 text-[11.5px] text-ink-faint">
+                      {row.note}
+                    </p>
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {row.looks.map((item) => {
+                        const on = digital.envelopeLook === item.id;
+                        return (
+                          <motion.button
+                            key={item.id}
+                            type="button"
+                            onClick={() =>
+                              // A matched set dresses every part at once.
+                              setDigital({
+                                envelopeLook: item.id,
+                                envelopeColour: item.hex,
+                                envelopeLiner: item.linerId,
+                              })
+                            }
+                            whileHover={{ scale: 1.05, y: -2 }}
+                            whileTap={{ scale: 0.96 }}
+                            transition={springBouncy}
+                            className="text-left"
+                          >
+                            <span
+                              className={cn(
+                                "relative block aspect-[4/3] overflow-hidden rounded-[9px] ring-2",
+                                on
+                                  ? "shadow-rail ring-ink"
+                                  : "ring-black/10 hover:ring-hairline-strong",
+                              )}
+                              style={{ backgroundColor: item.hex }}
+                            >
+                              <svg
+                                viewBox="0 0 100 75"
+                                className="absolute inset-0 h-full w-full"
+                                preserveAspectRatio="none"
+                              >
+                                <path
+                                  d="M0 0 L50 45 L100 0 Z"
+                                  fill={item.liner}
+                                />
+                                <path
+                                  d="M0 0 L50 45 L100 0"
+                                  fill="none"
+                                  stroke="rgb(0 0 0 / 0.16)"
+                                  strokeWidth="1"
+                                  vectorEffect="non-scaling-stroke"
+                                />
+                              </svg>
+                              <span className="absolute left-1/2 top-[52%] h-3 w-3 -translate-x-1/2 rounded-full bg-brand-red" />
+                            </span>
+                            <span
+                              className={cn(
+                                "mt-1.5 block text-[11.5px] leading-tight",
+                                on
+                                  ? "font-semibold text-ink"
+                                  : "text-ink-soft",
+                              )}
+                            >
+                              {item.label}
+                            </span>
+                          </motion.button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </Section>
+
+              <Divider />
+
+              <Section title="Fine-tune">
+                <h4 className="mb-2 text-[13px] font-semibold text-ink">
+                  Envelope colour
+                </h4>
+                <SwatchGrid
+                  colors={ENVELOPE_COLOURS}
+                  value={digital.envelopeColour}
+                  onChange={(hex) =>
+                    // Touching one part moves you off the matched set.
+                    setDigital({ envelopeColour: hex, envelopeLook: null })
+                  }
+                />
+              </Section>
+
+              <Section>
+                <Segmented
+                  id="envelope-decor"
+                  options={[
+                    { value: "liner", label: "Liner" },
+                    { value: "stamp", label: "Stamp" },
+                    { value: "seal", label: "Seal" },
+                  ]}
+                  value={digital.envelopeDecorPart}
+                  onChange={(part) =>
+                    setDigital({ envelopeDecorPart: part as EnvelopeDecorPart })
+                  }
+                />
+              </Section>
+
+              {ENVELOPE_DECOR[digital.envelopeDecorPart].rows.map((row) => (
+                <Section
+                  key={row.title}
+                  title={row.title}
+                  action={
+                    <span className="text-[11.5px] tabular-nums text-ink-faint">
+                      {row.count}
+                    </span>
+                  }
+                >
+                  <div className="grid grid-cols-4 gap-2">
+                    {row.order.map((i) => {
+                      const asset =
+                        ENVELOPE_DECOR[digital.envelopeDecorPart].assets[i];
+                      const on = selectedDecor === asset.id;
+                      return (
+                        <motion.button
+                          key={row.title + asset.id}
+                          type="button"
+                          title={asset.label}
+                          onClick={() => pickDecor(asset.id)}
+                          whileHover={{ scale: 1.06, y: -2 }}
+                          whileTap={{ scale: 0.95 }}
+                          transition={springBouncy}
+                          className="text-left"
+                        >
+                          <span
+                            className={cn(
+                              "block aspect-square rounded-[8px] ring-2",
+                              on
+                                ? "ring-ink"
+                                : "ring-transparent hover:ring-hairline-strong",
+                            )}
+                            style={{ backgroundImage: asset.swatch }}
+                          />
+                          <span
+                            className={cn(
+                              "mt-1 block truncate text-[10.5px] leading-tight",
+                              on ? "font-semibold text-ink" : "text-ink-faint",
+                            )}
+                          >
+                            {asset.label}
+                          </span>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </Section>
+              ))}
+
+              <Section>
+                <p className="flex gap-2 rounded-[12px] bg-surface-sunken/70 p-3 text-[12px] leading-snug text-ink-faint">
+                  <Check size={14} className="mt-0.5 shrink-0 text-brand-red" />
+                  <span>
+                    Liner, stamp and seal are included. No per-guest charges,
+                    ever.
+                  </span>
+                </p>
+              </Section>
+            </>
+          )}
+
           <Section title="Flap style">
             <div className="grid grid-cols-2 gap-3">
               {FLAPS.map((flap) => {

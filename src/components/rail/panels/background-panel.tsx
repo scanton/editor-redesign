@@ -1,0 +1,595 @@
+"use client";
+
+import { motion } from "motion/react";
+import { Check, Search } from "lucide-react";
+import { useMemo, useState } from "react";
+import { GradientBackground } from "@/components/canvas/gradient-background";
+import { PanelBody, Section, inputClass } from "@/components/rail/panels/parts";
+import { PeekCarousel } from "@/components/ui/peek-carousel";
+import { springBouncy, springTight, staggerParent } from "@/lib/motion";
+import {
+  BACKGROUND_TABS,
+  RECOMMENDED,
+  SCENE_COUNTS,
+  STILL_SCENES,
+  TOTAL_BACKGROUNDS,
+  describeScene,
+  findStill,
+  sceneKey,
+  type Scene,
+} from "@/lib/digital-card";
+import {
+  VIDEO_BACKGROUNDS,
+  findVideoBackground,
+} from "@/lib/video-backgrounds";
+import { GRADIENT_STYLES } from "@/lib/gradient-styles";
+import { PALETTES } from "@/lib/gradient-palettes";
+import {
+  THEME_EFFECTS,
+  THEME_PRESETS,
+  THEME_VARIATIONS,
+  describeTheme,
+  matchPreset,
+  themeTint,
+} from "@/lib/themes";
+import { useEditorStore } from "@/store/editor-store";
+import { cn } from "@/lib/utils";
+
+const DEFAULT_THEME = "tie-dye";
+const DEFAULT_EFFECT = "butterflies";
+
+/**
+ * The scene behind the card. Two of the four kinds are generated rather than
+ * listed — a gradient is a style crossed with a palette, an animated scene is a
+ * theme crossed with an effect — so each gets a small set of controls instead of
+ * a grid of hundreds of thumbnails.
+ *
+ * Those controls only appear when their kind is in play, so the panel is short
+ * unless you are actually working in it.
+ */
+export function BackgroundPanel() {
+  const scene = useEditorStore((s) => s.digital.scene);
+  const tab = useEditorStore((s) => s.digital.backgroundTab);
+  const setDigital = useEditorStore((s) => s.setDigital);
+  const [query, setQuery] = useState("");
+
+  const setScene = (next: Scene) => setDigital({ scene: next });
+  const q = query.trim().toLowerCase();
+
+  /** A kind's controls show when it is the active scene or the chosen tab. */
+  const showing = (kind: string) =>
+    !q && (tab === kind || (tab === "All" && scene.kind === kind));
+  /** Its picker always shows under All, so a kind can be reached. */
+  const listed = (kind: string) => !q && (tab === "All" || tab === kind);
+
+  const hits = useMemo(() => {
+    if (!q) return null;
+    return {
+      styles: GRADIENT_STYLES.filter((s) => s.name.toLowerCase().includes(q)),
+      presets: THEME_PRESETS.filter(
+        (p) =>
+          p.label.toLowerCase().includes(q) ||
+          describeTheme(p.themeId, p.effectId).toLowerCase().includes(q),
+      ),
+      videos: VIDEO_BACKGROUNDS.filter(
+        (v) =>
+          v.label.toLowerCase().includes(q) ||
+          v.category.toLowerCase().includes(q),
+      ),
+      stills: STILL_SCENES.filter((a) => a.label.toLowerCase().includes(q)),
+    };
+  }, [q]);
+
+  const gradientStyle =
+    scene.kind === "Gradient" ? scene.styleId : GRADIENT_STYLES[0].id;
+  const gradientPalette =
+    scene.kind === "Gradient" ? scene.paletteId : PALETTES[3].id;
+  const gradientSpeed = scene.kind === "Gradient" ? scene.speed : 12;
+
+  const themeId = scene.kind === "Animation" ? scene.themeId : DEFAULT_THEME;
+  const effectId =
+    scene.kind === "Animation" ? scene.effectId : DEFAULT_EFFECT;
+  const themeSpeed = scene.kind === "Animation" ? scene.speed : 60;
+  const activePreset =
+    scene.kind === "Animation" ? matchPreset(themeId, effectId) : null;
+
+  return (
+    <PanelBody>
+      <motion.div variants={staggerParent} initial="hidden" animate="visible">
+        <Section>
+          <div className="relative">
+            <Search
+              size={16}
+              className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-faint"
+            />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder={`Search ${TOTAL_BACKGROUNDS.toLocaleString()} backgrounds`}
+              className={cn(inputClass, "pl-10")}
+            />
+          </div>
+        </Section>
+
+        {!q && (
+          <Section>
+            <div className="flex flex-wrap gap-2">
+              {BACKGROUND_TABS.map((t) => (
+                <motion.button
+                  key={t}
+                  type="button"
+                  onClick={() => setDigital({ backgroundTab: t })}
+                  whileHover={{ scale: 1.04 }}
+                  whileTap={{ scale: 0.95 }}
+                  transition={springTight}
+                  className={cn(
+                    "rounded-full border px-3 py-1.5 text-[12.5px] font-medium transition-colors",
+                    tab === t
+                      ? "border-transparent bg-ink text-white"
+                      : "border-hairline text-ink-soft hover:text-ink",
+                  )}
+                >
+                  {t}
+                </motion.button>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        {/* ── Recommended: a spread of all three generated kinds ─────── */}
+        {!q && tab === "All" && (
+          <Section title="Recommended for this card">
+            <PeekCarousel
+              label="Recommended background"
+              items={RECOMMENDED.map((r) => ({
+                id: sceneKey(r),
+                label: describeScene(r),
+                sub: r.kind,
+              }))}
+              selectedId={sceneKey(scene)}
+              onSelect={(id) => {
+                const next = RECOMMENDED.find((r) => sceneKey(r) === id);
+                if (next) setScene(next);
+              }}
+              renderItem={(item) => {
+                const s = RECOMMENDED.find((r) => sceneKey(r) === item.id);
+                return s ? <ScenePreview scene={s} /> : null;
+              }}
+            />
+          </Section>
+        )}
+
+        {/* ── Video ────────────────────────────────────────────────────── */}
+        {(listed("Video") || hits?.videos.length) && (
+          <Section title="Video Backgrounds" action={<Count n={SCENE_COUNTS.video} />}>
+            <PeekCarousel
+              label="Video background"
+              items={(hits?.videos ?? VIDEO_BACKGROUNDS).map((v) => ({
+                id: v.id,
+                label: v.label,
+                sub: v.category,
+              }))}
+              selectedId={scene.kind === "Video" ? scene.id : null}
+              onSelect={(id) => setScene({ kind: "Video", id })}
+              renderItem={(item) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={findVideoBackground(item.id).src}
+                  alt=""
+                  draggable={false}
+                  className="h-full w-full object-cover"
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {/* ── Animation ────────────────────────────────────────────────── */}
+        {(listed("Animation") || hits?.presets.length) && (
+          <Section
+            title="Animation · presets"
+            action={<Count n={SCENE_COUNTS.themes} />}
+          >
+            <PeekCarousel
+              label="Animation preset"
+              items={(hits?.presets ?? THEME_PRESETS).map((p) => ({
+                id: p.id,
+                label: p.label,
+                sub: describeTheme(p.themeId, p.effectId),
+              }))}
+              selectedId={activePreset?.id ?? null}
+              onSelect={(id) => {
+                const preset = THEME_PRESETS.find((p) => p.id === id);
+                if (!preset) return;
+                setScene({
+                  kind: "Animation",
+                  themeId: preset.themeId,
+                  effectId: preset.effectId,
+                  speed: themeSpeed,
+                });
+              }}
+              renderItem={(item) => {
+                const preset = THEME_PRESETS.find((p) => p.id === item.id);
+                return (
+                  <span
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: themeTint(
+                        preset?.themeId ?? THEME_PRESETS[0].themeId,
+                      ),
+                    }}
+                  />
+                );
+              }}
+            />
+          </Section>
+        )}
+
+        {showing("Animation") && (
+          <>
+            <Section
+              title="Theme"
+              action={
+                <span className="text-[11.5px] font-medium text-brand-red">
+                  {activePreset ? activePreset.label : "Custom"}
+                </span>
+              }
+            >
+              <p className="mb-2.5 text-[12px] leading-snug text-ink-faint">
+                {describeTheme(themeId, effectId)} — mix any theme with any
+                effect, or start from a preset above.
+              </p>
+              <PillGrid
+                items={THEME_VARIATIONS.map((v) => ({ id: v.id, label: v.label }))}
+                activeId={themeId}
+                onPick={(id) =>
+                  setScene({
+                    kind: "Animation",
+                    themeId: id,
+                    effectId,
+                    speed: themeSpeed,
+                  })
+                }
+              />
+            </Section>
+
+            <Section title="Effect" action={<Count n={THEME_EFFECTS.length + 1} />}>
+              <PillGrid
+                items={[
+                  { id: "__none", label: "None" },
+                  ...THEME_EFFECTS.map((e) => ({ id: e.id, label: e.label })),
+                ]}
+                activeId={effectId ?? "__none"}
+                onPick={(id) =>
+                  setScene({
+                    kind: "Animation",
+                    themeId,
+                    effectId: id === "__none" ? null : id,
+                    speed: themeSpeed,
+                  })
+                }
+              />
+            </Section>
+
+            <SpeedControl
+              value={themeSpeed}
+              onChange={(speed) =>
+                setScene({ kind: "Animation", themeId, effectId, speed })
+              }
+            />
+          </>
+        )}
+
+        {/* ── Gradient ─────────────────────────────────────────────────── */}
+        {(listed("Gradient") || hits?.styles.length) && (
+          <Section title="Gradient · style" action={<Count n={SCENE_COUNTS.gradient} />}>
+            <PeekCarousel
+              label="Gradient style"
+              items={(hits?.styles ?? GRADIENT_STYLES).map((g) => ({
+                id: g.id,
+                label: g.name,
+                sub: g.description,
+              }))}
+              selectedId={scene.kind === "Gradient" ? scene.styleId : null}
+              onSelect={(id) =>
+                setScene({
+                  kind: "Gradient",
+                  styleId: id,
+                  paletteId: gradientPalette,
+                  speed: gradientSpeed,
+                })
+              }
+              renderItem={(item) => (
+                // The slide is the real renderer, so the carousel previews the
+                // scene rather than a picture of it.
+                <GradientBackground
+                  styleId={item.id}
+                  palette={
+                    PALETTES.find((p) => p.id === gradientPalette) ?? PALETTES[0]
+                  }
+                  maxDimension={220}
+                  speed={Math.min(gradientSpeed, 20)}
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {showing("Gradient") && (
+          <>
+            <Section title="Palette" action={<Count n={PALETTES.length} />}>
+              <div className="grid grid-cols-4 gap-2">
+                {PALETTES.map((palette) => {
+                  const on =
+                    scene.kind === "Gradient" && scene.paletteId === palette.id;
+                  return (
+                    <motion.button
+                      key={palette.id}
+                      type="button"
+                      title={palette.name}
+                      onClick={() =>
+                        setScene({
+                          kind: "Gradient",
+                          styleId: gradientStyle,
+                          paletteId: palette.id,
+                          speed: gradientSpeed,
+                        })
+                      }
+                      whileHover={{ scale: 1.06, y: -2 }}
+                      whileTap={{ scale: 0.95 }}
+                      transition={springTight}
+                      className="text-left"
+                    >
+                      <span
+                        className={cn(
+                          "flex h-7 overflow-hidden rounded-[7px] ring-2",
+                          on ? "ring-ink" : "ring-transparent hover:ring-hairline-strong",
+                        )}
+                      >
+                        {palette.colors.map((c) => (
+                          <span key={c} className="flex-1" style={{ backgroundColor: c }} />
+                        ))}
+                      </span>
+                      <span
+                        className={cn(
+                          "mt-1 block truncate text-[10.5px] leading-tight",
+                          on ? "font-semibold text-ink" : "text-ink-faint",
+                        )}
+                      >
+                        {palette.name}
+                      </span>
+                    </motion.button>
+                  );
+                })}
+              </div>
+            </Section>
+
+            <SpeedControl
+              value={gradientSpeed}
+              onChange={(speed) =>
+                setScene({
+                  kind: "Gradient",
+                  styleId: gradientStyle,
+                  paletteId: gradientPalette,
+                  speed,
+                })
+              }
+            />
+          </>
+        )}
+
+        {/* ── Stills ───────────────────────────────────────────────────── */}
+        {(listed("Stills") || hits?.stills.length) && (
+          <Section title="Stills" action={<Count n={SCENE_COUNTS.stills} />}>
+            <div className="grid grid-cols-2 gap-2.5">
+              {(hits?.stills ?? STILL_SCENES).map((still) => (
+                <Tile
+                  key={still.id}
+                  label={still.label}
+                  on={scene.kind === "Stills" && scene.id === still.id}
+                  wide
+                  onPick={() => setScene({ kind: "Stills", id: still.id })}
+                >
+                  <span
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: `linear-gradient(145deg, ${findStill(still.id).gradient})`,
+                    }}
+                  />
+                </Tile>
+              ))}
+            </div>
+          </Section>
+        )}
+
+        <Section>
+          <p className="rounded-[12px] bg-surface-sunken/70 p-3 text-[12px] leading-snug text-ink-faint">
+            Scene changes are instant. The scene sits behind the card rather than
+            in it, so your artwork is never touched and there is nothing to wait
+            for.
+          </p>
+        </Section>
+      </motion.div>
+    </PanelBody>
+  );
+}
+
+/**
+ * A slide in the Recommended row, which mixes all three generated kinds — so it
+ * has to dispatch on the scene rather than assume one renderer.
+ */
+function ScenePreview({ scene }: { scene: Scene }) {
+  if (scene.kind === "Gradient") {
+    return (
+      <GradientBackground
+        styleId={scene.styleId}
+        palette={PALETTES.find((p) => p.id === scene.paletteId) ?? PALETTES[0]}
+        maxDimension={220}
+        speed={Math.min(scene.speed, 20)}
+      />
+    );
+  }
+  if (scene.kind === "Animation") {
+    return (
+      <span
+        className="absolute inset-0"
+        style={{ backgroundImage: themeTint(scene.themeId) }}
+      />
+    );
+  }
+  if (scene.kind === "Video") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={findVideoBackground(scene.id).src}
+        alt=""
+        draggable={false}
+        className="h-full w-full object-cover"
+      />
+    );
+  }
+  return (
+    <span
+      className="absolute inset-0"
+      style={{
+        backgroundImage: `linear-gradient(145deg, ${findStill(scene.id).gradient})`,
+      }}
+    />
+  );
+}
+
+/** 0 stops the motion entirely; the label says so rather than reading "0%". */
+function SpeedControl({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <Section
+      title="Motion"
+      action={
+        <span className="text-[11.5px] tabular-nums text-ink-faint">
+          {value === 0 ? "Still" : `${value}%`}
+        </span>
+      }
+    >
+      <input
+        type="range"
+        min={0}
+        max={100}
+        value={value}
+        aria-label="Motion speed"
+        onChange={(e) => onChange(Number(e.target.value))}
+        className="w-full accent-brand-red"
+      />
+      <p className="mt-1.5 text-[12px] text-ink-faint">
+        Drag to nothing for a still scene. Reduced-motion settings are always
+        respected regardless.
+      </p>
+    </Section>
+  );
+}
+
+function PillGrid({
+  items,
+  activeId,
+  onPick,
+}: {
+  items: { id: string; label: string }[];
+  activeId: string;
+  onPick: (id: string) => void;
+}) {
+  return (
+    <div className="scroll-slim -mx-1 max-h-[176px] overflow-y-auto px-1">
+      <div className="flex flex-wrap gap-1.5">
+        {items.map((item) => {
+          const on = item.id === activeId;
+          return (
+            <motion.button
+              key={item.id}
+              type="button"
+              onClick={() => onPick(item.id)}
+              whileHover={{ scale: 1.04, y: -1 }}
+              whileTap={{ scale: 0.95 }}
+              transition={springTight}
+              className={cn(
+                "rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors",
+                on
+                  ? "border-transparent bg-ink text-white"
+                  : "border-hairline text-ink-soft hover:border-hairline-strong hover:text-ink",
+              )}
+            >
+              {item.label}
+            </motion.button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function Count({ n }: { n: number }) {
+  return (
+    <span className="text-[11.5px] tabular-nums text-ink-faint">
+      {n.toLocaleString()}
+    </span>
+  );
+}
+
+function Tile({
+  label,
+  sub,
+  on,
+  wide,
+  title,
+  onPick,
+  children,
+}: {
+  label: string;
+  sub?: string;
+  on: boolean;
+  wide?: boolean;
+  title?: string;
+  onPick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <motion.button
+      type="button"
+      title={title}
+      onClick={onPick}
+      whileHover={{ scale: 1.04, y: -2 }}
+      whileTap={{ scale: 0.96 }}
+      transition={springTight}
+      className="text-left"
+    >
+      <span
+        className={cn(
+          "relative flex items-end overflow-hidden rounded-[9px] p-1.5 ring-2 transition-shadow",
+          wide ? "aspect-[16/10]" : "aspect-square",
+          on ? "shadow-rail ring-ink" : "ring-transparent hover:ring-hairline-strong",
+        )}
+      >
+        {children}
+        <span className="relative z-10 text-[10.5px] font-semibold leading-tight text-white drop-shadow">
+          {label}
+        </span>
+        {on && (
+          <motion.span
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={springBouncy}
+            className="absolute right-1 top-1 z-10 flex h-4 w-4 items-center justify-center rounded-full bg-ink text-white"
+          >
+            <Check size={10} strokeWidth={3} />
+          </motion.span>
+        )}
+      </span>
+      {sub && (
+        <span className="mt-1 block truncate text-[10.5px] text-ink-faint">{sub}</span>
+      )}
+    </motion.button>
+  );
+}

@@ -16,7 +16,10 @@ export function useFontFamilies() {
       const styles = getComputedStyle(document.documentElement);
       setFamilies({
         Fredoka: styles.getPropertyValue("--font-fredoka").trim() || "sans-serif",
-        Inter: styles.getPropertyValue("--font-inter").trim() || "sans-serif",
+        "DM Sans":
+          styles.getPropertyValue("--font-dm-sans").trim() || "sans-serif",
+        Instrument:
+          styles.getPropertyValue("--font-instrument").trim() || "sans-serif",
         Caveat: styles.getPropertyValue("--font-caveat").trim() || "cursive",
         Arima: styles.getPropertyValue("--font-arima").trim() || "sans-serif",
       });

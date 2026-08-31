@@ -5,16 +5,18 @@ import { useState, type ReactNode } from "react";
 import { springBouncy } from "@/lib/motion";
 import { cn } from "@/lib/utils";
 
-type Side = "right" | "bottom" | "top";
+type Side = "right" | "left" | "bottom" | "top";
 
 const sideClasses: Record<Side, string> = {
   right: "left-full top-1/2 -translate-y-1/2 ml-3",
+  left: "right-full top-1/2 -translate-y-1/2 mr-3",
   bottom: "top-full left-1/2 -translate-x-1/2 mt-2",
   top: "bottom-full left-1/2 -translate-x-1/2 mb-2",
 };
 
 const sideOffset: Record<Side, { x?: number; y?: number }> = {
   right: { x: -6 },
+  left: { x: 6 },
   bottom: { y: -6 },
   top: { y: 6 },
 };

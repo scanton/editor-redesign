@@ -1,4 +1,19 @@
-import { Languages, Mail, PenLine, ScrollText, Shapes, Type } from "lucide-react";
+import {
+  ImagePlay,
+  MapPin,
+  Printer,
+  Send,
+  Languages,
+  LayoutTemplate,
+  Mail,
+  PenLine,
+  Play,
+  Receipt,
+  ScrollText,
+  Shapes,
+  Sparkles,
+  Type,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ToolId } from "@/lib/types";
 
@@ -46,9 +61,63 @@ export const TOOLS: ToolDef[] = [
     blurb: "A newsletter, a poem, a letter — and where it goes.",
   },
   {
+    id: "cardtype",
+    label: "Card type",
+    icon: Sparkles,
+    blurb: "Digital or printed — both stay saved.",
+  },
+  {
+    id: "background",
+    label: "Background",
+    icon: ImagePlay,
+    blurb: "The 3D scene behind the card.",
+  },
+  {
     id: "envelope",
     label: "Envelope",
     icon: Mail,
-    blurb: "Envelope color, liner, and the addresses on it.",
+    blurb: "Look, colour, liner, seal, stamp and flap.",
+  },
+  {
+    id: "reveal",
+    label: "Reveal",
+    icon: Play,
+    blurb: "How the card opens on their screen.",
+  },
+  {
+    id: "cover",
+    label: "Cover",
+    icon: LayoutTemplate,
+    blurb: "Read before the envelope opens.",
+  },
+  {
+    id: "delivery",
+    label: "Delivery",
+    icon: Send,
+    blurb: "How it reaches them.",
+  },
+  {
+    id: "recipients",
+    label: "Recipients",
+    icon: MapPin,
+    blurb: "Who gets it.",
+  },
+  {
+    id: "printopts",
+    label: "Print options",
+    icon: Printer,
+    blurb: "Stock, corners and quantity.",
+  },
+  {
+    id: "review",
+    label: "Review",
+    icon: Receipt,
+    blurb: "Everything you have decided, before it ships.",
   },
 ];
+
+export function toolsForStep(ids: ToolId[]) {
+  return ids
+    .map((id) => TOOLS.find((t) => t.id === id))
+    .filter((t): t is ToolDef => Boolean(t));
+}

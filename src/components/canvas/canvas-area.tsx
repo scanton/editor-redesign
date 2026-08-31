@@ -7,7 +7,8 @@ import { EraserLayer } from "@/components/canvas/eraser-layer";
 import { RegionLayer } from "@/components/canvas/region-layer";
 import { CanvasTools } from "@/components/canvas/canvas-tools";
 import { EnvelopePreview } from "@/components/canvas/envelope-preview";
-import { PlacementLayer } from "@/components/canvas/placement-layer";
+import { SceneLayer } from "@/components/canvas/scene-layer";
+import { PlacementLayers } from "@/components/canvas/placement-layers";
 import { FaceSwitcher } from "@/components/canvas/face-switcher";
 import { springHeavy } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
@@ -20,14 +21,16 @@ export function CanvasArea() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const face = useEditorStore((s) => s.face);
-  // The Envelope tool takes over the canvas — you're addressing the envelope,
-  // not editing the card.
-  const showEnvelope = useEditorStore((s) => s.activeTool === "envelope");
-  // Marking up the card takes the pointer, so the two never overlap.
-  const placing = useEditorStore(
-    (s) => s.activeTool === "longform" && s.canvasMode === "select",
+  // The face switcher decides what the canvas shows; the envelope is a face of
+  // the digital card, not a takeover.
+  const showEnvelope = useEditorStore((s) => s.surface === "envelope");
+  // A digital card is never shown on editor grey — it ships inside a scene.
+  const showScene = useEditorStore(
+    (s) => s.cardType === "digital" && s.surface === "card",
   );
   const setViewport = useEditorStore((s) => s.setViewport);
+  // Finish is checkout — nothing on the card is editable from there.
+  const editing = useEditorStore((s) => s.step !== 3);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -49,6 +52,8 @@ export function CanvasArea() {
         className="canvas-backdrop relative min-h-0 flex-1 overflow-hidden"
         style={{ perspective: 2000 }}
       >
+        {showScene && <SceneLayer />}
+
         {size.width > 0 && (
           <AnimatePresence mode="popLayout" initial={false}>
             <motion.div
@@ -68,10 +73,8 @@ export function CanvasArea() {
           </AnimatePresence>
         )}
 
-        {/* Placement box for the long-form block, while that panel is open. */}
-        {!showEnvelope && size.width > 0 && placing && (
-          <PlacementLayer viewport={size} />
-        )}
+        {/* Placement boxes for whichever panel owns a placeable piece. */}
+        {!showEnvelope && size.width > 0 && <PlacementLayers viewport={size} />}
 
         {/* Marking up regions is a card operation — no meaning on the envelope. */}
         {!showEnvelope && size.width > 0 && <RegionLayer viewport={size} />}
@@ -79,9 +82,11 @@ export function CanvasArea() {
       </div>
 
       <AnimatePresence>
-        {!showEnvelope && <CanvasTools key="tools" />}
-        {!showEnvelope && <FaceSwitcher key="faces" />}
+        {/* No marking up an envelope — but the switcher has to stay, or the
+            envelope face becomes a room with no door back to the card. */}
+        {editing && !showEnvelope && <CanvasTools key="tools" />}
       </AnimatePresence>
+      <FaceSwitcher />
     </div>
   );
 }

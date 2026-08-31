@@ -9,10 +9,19 @@ import {
   sampleFor,
   type LongFormLength,
 } from "@/lib/long-form";
+import {
+  REVEAL_STEPS,
+  type CoverLayout,
+  type Scene,
+} from "@/lib/digital-card";
 import type {
   AnnotationRect,
   AnnotationRequest,
   CanvasMode,
+  CardType,
+  Surface,
+  Segment,
+  Step,
   CardDoc,
   EditorNode,
   Envelope,
@@ -20,6 +29,13 @@ import type {
   ToolId,
 } from "@/lib/types";
 import { boundsOf } from "@/lib/lasso";
+import { stepTools } from "@/lib/steps";
+import type {
+  DigitalDelivery,
+  PrintedDelivery,
+  Recipient,
+} from "@/lib/fulfilment";
+import { CARD_TYPES } from "@/lib/pricing";
 import { clamp, uid } from "@/lib/utils";
 
 const MAX_HISTORY = 50;
@@ -37,8 +53,65 @@ const CANVAS_PADDING_Y = TOOLBAR_INSET + SWITCHER_INSET + 90;
 type EditorState = {
   doc: CardDoc;
   face: FaceId;
-  selectedId: string | null;
   activeTool: ToolId | null;
+
+  /** Create → Personalize → Finish. The rail regroups per step. */
+  step: Step;
+  setStep: (step: Step) => void;
+  /** One card, two saved renditions. Switching never discards the other. */
+  cardType: CardType;
+  setCardType: (type: CardType) => void;
+
+  /** The canvas shows the card or the envelope it arrives in. */
+  surface: Surface;
+  setSurface: (surface: Surface) => void;
+
+  /** Digital rendition: the scene behind the card, how it opens, what they read first. */
+  digital: {
+    scene: Scene;
+    backgroundTab: string;
+    envelopeLook: string | null;
+    envelopeColour: string;
+    /** Which part of the envelope the fine-tune rows are showing. */
+    envelopeDecorPart: "liner" | "stamp" | "seal";
+    envelopeLiner: string;
+    envelopeStamp: string;
+    envelopeSeal: string;
+    reveal: {
+      preset: string;
+      /** Step ids in play order; reorderable. */
+      sequence: string[];
+      skipped: string[];
+      music: boolean;
+      reducedMotion: boolean;
+    };
+    cover: {
+      on: boolean;
+      showSender: boolean;
+      showAvatar: boolean;
+      layout: CoverLayout;
+    };
+  };
+  setDigital: (patch: Partial<EditorState["digital"]>) => void;
+
+  /** Finish: how it reaches them, who gets it, and what that costs. */
+  fulfilment: {
+    digitalDelivery: DigitalDelivery;
+    printedDelivery: PrintedDelivery;
+    recipients: Recipient[];
+    quantity: number;
+  };
+  setFulfilment: (patch: Partial<EditorState["fulfilment"]>) => void;
+  addRecipient: () => void;
+  updateRecipient: (id: string, patch: Partial<Recipient>) => void;
+  removeRecipient: (id: string) => void;
+  /** Both renditions can end up in the same order. */
+  alsoInCart: boolean;
+  setAlsoInCart: (value: boolean) => void;
+  orderTotal: () => number;
+  setReveal: (patch: Partial<EditorState["digital"]["reveal"]>) => void;
+  setCover: (patch: Partial<EditorState["digital"]["cover"]>) => void;
+  toggleRevealStep: (id: string) => void;
   /** Flyout stays mounted but collapses when the rail is pinned closed. */
   railPinned: boolean;
   zoom: number;
@@ -49,7 +122,6 @@ type EditorState = {
   future: CardDoc[];
 
   setFace: (face: FaceId) => void;
-  select: (id: string | null) => void;
   setTool: (tool: ToolId | null) => void;
   toggleTool: (tool: ToolId) => void;
   setRailPinned: (pinned: boolean) => void;
@@ -72,9 +144,9 @@ type EditorState = {
   removeNode: (id: string) => void;
   addNode: (node: EditorNode, face?: FaceId) => void;
 
-  /** Styles panel is multi-select — a card can read as "photo + bold". */
+  /** One art style at a time — the library names are the real catalogue. */
   selectedStyles: string[];
-  toggleStyle: (id: string) => void;
+  setStyle: (id: string) => void;
 
   envelope: Envelope;
   updateEnvelope: (patch: Partial<Envelope>) => void;
@@ -90,6 +162,13 @@ type EditorState = {
   /** Freehand path being traced, in card coordinates. */
   draftLasso: number[] | null;
   setDraftLasso: (points: number[] | null) => void;
+  /** Segment under the pointer in Element mode. */
+  hoverSegment: string | null;
+  /** Name of the picked segment, if the region came from Element mode. */
+  draftSegmentLabel: string | null;
+  setHoverSegment: (id: string | null) => void;
+  /** Clicking a segment opens the same prompt drawing a region does. */
+  selectSegment: (segment: Segment) => void;
   annotationRequests: AnnotationRequest[];
   submitAnnotation: (instruction: string) => void;
   resolveAnnotation: (id: string) => void;
@@ -141,8 +220,150 @@ function cloneDoc(doc: CardDoc): CardDoc {
 export const useEditorStore = create<EditorState>((set, get) => ({
   doc: cloneDoc(sampleCard),
   face: "front",
-  selectedId: null,
   activeTool: null,
+
+  step: 1,
+  setStep: (step) => {
+    // Panels belong to a step; leaving a step closes whatever it had open.
+    const tool = get().activeTool;
+    const keeps = tool !== null && stepTools(step, get().cardType).includes(tool);
+    set({
+      step,
+      activeTool: keeps ? tool : null,
+      agentOpen: step !== 3,
+      canvasMode: "element",
+      draftAnnotation: null,
+      draftLasso: null,
+      eraserStrokes: [],
+    });
+  },
+  cardType: "printed",
+  setCardType: (cardType) => {
+    // The rail forks here, so a panel that only exists on the other rendition
+    // has to close rather than linger.
+    const { step, activeTool } = get();
+    const keeps =
+      activeTool !== null && stepTools(step, cardType).includes(activeTool);
+    set({
+      cardType,
+      activeTool: keeps ? activeTool : "cardtype",
+      surface: "card",
+    });
+  },
+
+  surface: "card",
+  setSurface: (surface) => set({ surface }),
+
+  digital: {
+    scene: {
+      kind: "Gradient",
+      styleId: "aurora",
+      paletteId: "northern-lights",
+      speed: 12,
+    },
+    backgroundTab: "All",
+    envelopeLook: "m1",
+    envelopeColour: "#f5bdc2",
+    envelopeDecorPart: "liner",
+    envelopeLiner: "baby",
+    envelopeStamp: "classic",
+    envelopeSeal: "wax-red",
+    reveal: {
+      preset: "rise",
+      sequence: REVEAL_STEPS.map((s) => s.id),
+      skipped: [],
+      music: false,
+      reducedMotion: true,
+    },
+    cover: {
+      on: true,
+      showSender: true,
+      showAvatar: true,
+      layout: "centred",
+    },
+  },
+  setDigital: (patch) => set((s) => ({ digital: { ...s.digital, ...patch } })),
+
+  fulfilment: {
+    digitalDelivery: "link",
+    printedDelivery: "mail",
+    recipients: [
+      {
+        id: "r1",
+        name: "Trish Sparks",
+        email: "trish@sparks.co",
+        line1: "129 E. Fremont Dr.",
+        line2: "Las Vegas, NV 89101",
+      },
+    ],
+    quantity: 1,
+  },
+  setFulfilment: (patch) =>
+    set((s) => ({ fulfilment: { ...s.fulfilment, ...patch } })),
+  addRecipient: () =>
+    set((s) => ({
+      fulfilment: {
+        ...s.fulfilment,
+        recipients: [
+          ...s.fulfilment.recipients,
+          { id: uid("rcp"), name: "", email: "", line1: "", line2: "" },
+        ],
+      },
+    })),
+  updateRecipient: (id, patch) =>
+    set((s) => ({
+      fulfilment: {
+        ...s.fulfilment,
+        recipients: s.fulfilment.recipients.map((r) =>
+          r.id === id ? { ...r, ...patch } : r,
+        ),
+      },
+    })),
+  removeRecipient: (id) =>
+    set((s) => ({
+      fulfilment: {
+        ...s.fulfilment,
+        // Never leave the list empty — there is always someone to send to.
+        recipients:
+          s.fulfilment.recipients.length > 1
+            ? s.fulfilment.recipients.filter((r) => r.id !== id)
+            : s.fulfilment.recipients,
+      },
+    })),
+  alsoInCart: false,
+  setAlsoInCart: (alsoInCart) => set({ alsoInCart }),
+
+  // Digital is priced per recipient because each one gets their own link;
+  // print is priced per copy.
+  orderTotal: () => {
+    const { cardType, fulfilment, alsoInCart } = get();
+    const unit = (id: "digital" | "printed") =>
+      CARD_TYPES.find((t) => t.id === id)!.unit;
+    const digitalSum = unit("digital") * fulfilment.recipients.length;
+    const printedSum = unit("printed") * fulfilment.quantity;
+    const primary = cardType === "digital" ? digitalSum : printedSum;
+    const extra = alsoInCart
+      ? cardType === "digital"
+        ? printedSum
+        : digitalSum
+      : 0;
+    return primary + extra;
+  },
+  setReveal: (patch) =>
+    set((s) => ({
+      digital: { ...s.digital, reveal: { ...s.digital.reveal, ...patch } },
+    })),
+  setCover: (patch) =>
+    set((s) => ({
+      digital: { ...s.digital, cover: { ...s.digital.cover, ...patch } },
+    })),
+  toggleRevealStep: (id) =>
+    set((s) => {
+      const skipped = s.digital.reveal.skipped.includes(id)
+        ? s.digital.reveal.skipped.filter((x) => x !== id)
+        : [...s.digital.reveal.skipped, id];
+      return { digital: { ...s.digital, reveal: { ...s.digital.reveal, skipped } } };
+    }),
   railPinned: false,
   zoom: 0.46,
   credits: 10535,
@@ -152,10 +373,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   future: [],
 
   setFace: (face) => {
-    set({ face, selectedId: null });
+    set({ face, draftAnnotation: null, draftLasso: null, hoverSegment: null });
     get().maybeFit();
   },
-  select: (selectedId) => set({ selectedId }),
   setTool: (activeTool) => set({ activeTool }),
   toggleTool: (tool) =>
     set((s) => ({ activeTool: s.activeTool === tool ? null : tool })),
@@ -232,7 +452,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     face.nodes = face.nodes.filter((n) => n.id !== id);
     set({
       doc,
-      selectedId: state.selectedId === id ? null : state.selectedId,
       past: [...state.past, cloneDoc(state.doc)].slice(-MAX_HISTORY),
       future: [],
     });
@@ -244,25 +463,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     doc.faces[face ?? state.face].nodes.push(node);
     set({
       doc,
-      selectedId: node.id,
       past: [...state.past, cloneDoc(state.doc)].slice(-MAX_HISTORY),
       future: [],
     });
   },
 
-  selectedStyles: ["bold"],
-  toggleStyle: (id) =>
-    set((s) => ({
-      selectedStyles: s.selectedStyles.includes(id)
-        ? s.selectedStyles.filter((x) => x !== id)
-        : [...s.selectedStyles, id],
-    })),
+  selectedStyles: ["ethereal-glitter-portrait"],
+  setStyle: (id) => set({ selectedStyles: [id] }),
 
   envelope: defaultEnvelope,
   updateEnvelope: (patch) =>
     set((s) => ({ envelope: { ...s.envelope, ...patch } })),
 
-  canvasMode: "select",
+  canvasMode: "element",
   // Switching mode clears any half-drawn region, and drops the selection so
   // transformer handles aren't sitting on top of the area you're marking.
   setCanvasMode: (canvasMode) =>
@@ -270,18 +483,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       canvasMode,
       draftAnnotation: null,
       draftLasso: null,
+      draftSegmentLabel: null,
       eraserStrokes: [],
-      selectedId: null,
+      hoverSegment: null,
     }),
 
   draftAnnotation: null,
-  setDraftAnnotation: (draftAnnotation) => set({ draftAnnotation }),
+  setDraftAnnotation: (draftAnnotation) =>
+    set({ draftAnnotation, draftSegmentLabel: null }),
   draftLasso: null,
   setDraftLasso: (draftLasso) => set({ draftLasso }),
+  hoverSegment: null,
+  draftSegmentLabel: null,
+  setHoverSegment: (hoverSegment) => set({ hoverSegment }),
+  selectSegment: (segment) =>
+    set({
+      draftAnnotation: boundsOf(segment.points),
+      draftLasso: segment.points,
+      draftSegmentLabel: segment.label,
+      hoverSegment: null,
+    }),
 
   annotationRequests: [],
   submitAnnotation: (instruction) => {
-    const { draftAnnotation, draftLasso, face } = get();
+    const { draftAnnotation, draftLasso, draftSegmentLabel, face } = get();
     if (!draftAnnotation || !instruction.trim()) return;
 
     const request: AnnotationRequest = {
@@ -289,6 +514,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       face,
       rect: draftAnnotation,
       points: draftLasso ?? undefined,
+      segmentLabel: draftSegmentLabel ?? undefined,
       instruction: instruction.trim(),
       kind: "edit",
       status: "rendering",
@@ -298,7 +524,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       annotationRequests: [...s.annotationRequests, request],
       draftAnnotation: null,
       draftLasso: null,
-      canvasMode: "select",
+      draftSegmentLabel: null,
+      canvasMode: "element",
       agentOpen: true,
     }));
 
@@ -339,7 +566,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({
       annotationRequests: [...s.annotationRequests, request],
       eraserStrokes: [],
-      canvasMode: "select",
+      canvasMode: "element",
       agentOpen: true,
     }));
 
@@ -404,7 +631,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         y: rect.y,
         width: rect.width,
         fontSize: 34,
-        fontFamily: "Inter",
+        fontFamily: "DM Sans",
         fontStyle: "normal",
         fill: "#f7f0dd",
         align: "left",

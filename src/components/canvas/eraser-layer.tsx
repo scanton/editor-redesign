@@ -52,7 +52,7 @@ export function EraserLayer({
   useEffect(() => {
     if (!active) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setMode("select");
+      if (e.key === "Escape") setMode("element");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -102,7 +102,7 @@ export function EraserLayer({
   const cancel = () => {
     strokesRef.current = [];
     clear();
-    setMode("select");
+    setMode("element");
   };
 
   const hasPaint = strokes.some((s) => s.length >= 2);
