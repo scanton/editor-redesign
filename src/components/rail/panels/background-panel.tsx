@@ -8,12 +8,20 @@ import { PanelBody, Section, inputClass } from "@/components/rail/panels/parts";
 import { PeekCarousel } from "@/components/ui/peek-carousel";
 import { springBouncy, springTight, staggerParent } from "@/lib/motion";
 import {
-  ASSET_SCENES,
   BACKGROUND_TABS,
+  RECOMMENDED,
   SCENE_COUNTS,
+  STILL_SCENES,
   TOTAL_BACKGROUNDS,
+  describeScene,
+  findStill,
+  sceneKey,
   type Scene,
 } from "@/lib/digital-card";
+import {
+  VIDEO_BACKGROUNDS,
+  findVideoBackground,
+} from "@/lib/video-backgrounds";
 import { GRADIENT_STYLES } from "@/lib/gradient-styles";
 import { PALETTES } from "@/lib/gradient-palettes";
 import {
@@ -63,7 +71,12 @@ export function BackgroundPanel() {
           p.label.toLowerCase().includes(q) ||
           describeTheme(p.themeId, p.effectId).toLowerCase().includes(q),
       ),
-      assets: ASSET_SCENES.filter((a) => a.label.toLowerCase().includes(q)),
+      videos: VIDEO_BACKGROUNDS.filter(
+        (v) =>
+          v.label.toLowerCase().includes(q) ||
+          v.category.toLowerCase().includes(q),
+      ),
+      stills: STILL_SCENES.filter((a) => a.label.toLowerCase().includes(q)),
     };
   }, [q]);
 
@@ -121,6 +134,150 @@ export function BackgroundPanel() {
               ))}
             </div>
           </Section>
+        )}
+
+        {/* ── Recommended: a spread of all three generated kinds ─────── */}
+        {!q && tab === "All" && (
+          <Section title="Recommended for this card">
+            <PeekCarousel
+              label="Recommended background"
+              items={RECOMMENDED.map((r) => ({
+                id: sceneKey(r),
+                label: describeScene(r),
+                sub: r.kind,
+              }))}
+              selectedId={sceneKey(scene)}
+              onSelect={(id) => {
+                const next = RECOMMENDED.find((r) => sceneKey(r) === id);
+                if (next) setScene(next);
+              }}
+              renderItem={(item) => {
+                const s = RECOMMENDED.find((r) => sceneKey(r) === item.id);
+                return s ? <ScenePreview scene={s} /> : null;
+              }}
+            />
+          </Section>
+        )}
+
+        {/* ── Video ────────────────────────────────────────────────────── */}
+        {(listed("Video") || hits?.videos.length) && (
+          <Section title="Video Backgrounds" action={<Count n={SCENE_COUNTS.video} />}>
+            <PeekCarousel
+              label="Video background"
+              items={(hits?.videos ?? VIDEO_BACKGROUNDS).map((v) => ({
+                id: v.id,
+                label: v.label,
+                sub: v.category,
+              }))}
+              selectedId={scene.kind === "Video" ? scene.id : null}
+              onSelect={(id) => setScene({ kind: "Video", id })}
+              renderItem={(item) => (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  src={findVideoBackground(item.id).src}
+                  alt=""
+                  draggable={false}
+                  className="h-full w-full object-cover"
+                />
+              )}
+            />
+          </Section>
+        )}
+
+        {/* ── Animation ────────────────────────────────────────────────── */}
+        {(listed("Animation") || hits?.presets.length) && (
+          <Section
+            title="Animation · presets"
+            action={<Count n={SCENE_COUNTS.themes} />}
+          >
+            <PeekCarousel
+              label="Animation preset"
+              items={(hits?.presets ?? THEME_PRESETS).map((p) => ({
+                id: p.id,
+                label: p.label,
+                sub: describeTheme(p.themeId, p.effectId),
+              }))}
+              selectedId={activePreset?.id ?? null}
+              onSelect={(id) => {
+                const preset = THEME_PRESETS.find((p) => p.id === id);
+                if (!preset) return;
+                setScene({
+                  kind: "Animation",
+                  themeId: preset.themeId,
+                  effectId: preset.effectId,
+                  speed: themeSpeed,
+                });
+              }}
+              renderItem={(item) => {
+                const preset = THEME_PRESETS.find((p) => p.id === item.id);
+                return (
+                  <span
+                    className="absolute inset-0"
+                    style={{
+                      backgroundImage: themeTint(
+                        preset?.themeId ?? THEME_PRESETS[0].themeId,
+                      ),
+                    }}
+                  />
+                );
+              }}
+            />
+          </Section>
+        )}
+
+        {showing("Animation") && (
+          <>
+            <Section
+              title="Theme"
+              action={
+                <span className="text-[11.5px] font-medium text-brand-red">
+                  {activePreset ? activePreset.label : "Custom"}
+                </span>
+              }
+            >
+              <p className="mb-2.5 text-[12px] leading-snug text-ink-faint">
+                {describeTheme(themeId, effectId)} — mix any theme with any
+                effect, or start from a preset above.
+              </p>
+              <PillGrid
+                items={THEME_VARIATIONS.map((v) => ({ id: v.id, label: v.label }))}
+                activeId={themeId}
+                onPick={(id) =>
+                  setScene({
+                    kind: "Animation",
+                    themeId: id,
+                    effectId,
+                    speed: themeSpeed,
+                  })
+                }
+              />
+            </Section>
+
+            <Section title="Effect" action={<Count n={THEME_EFFECTS.length + 1} />}>
+              <PillGrid
+                items={[
+                  { id: "__none", label: "None" },
+                  ...THEME_EFFECTS.map((e) => ({ id: e.id, label: e.label })),
+                ]}
+                activeId={effectId ?? "__none"}
+                onPick={(id) =>
+                  setScene({
+                    kind: "Animation",
+                    themeId,
+                    effectId: id === "__none" ? null : id,
+                    speed: themeSpeed,
+                  })
+                }
+              />
+            </Section>
+
+            <SpeedControl
+              value={themeSpeed}
+              onChange={(speed) =>
+                setScene({ kind: "Animation", themeId, effectId, speed })
+              }
+            />
+          </>
         )}
 
         {/* ── Gradient ─────────────────────────────────────────────────── */}
@@ -221,140 +378,29 @@ export function BackgroundPanel() {
           </>
         )}
 
-        {/* ── Animated themes ──────────────────────────────────────────── */}
-        {(listed("Animation") || hits?.presets.length) && (
-          <Section
-            title="Animation · presets"
-            action={<Count n={SCENE_COUNTS.themes} />}
-          >
-            <PeekCarousel
-              label="Animation preset"
-              items={(hits?.presets ?? THEME_PRESETS).map((p) => ({
-                id: p.id,
-                label: p.label,
-                sub: describeTheme(p.themeId, p.effectId),
-              }))}
-              selectedId={activePreset?.id ?? null}
-              onSelect={(id) => {
-                const preset = THEME_PRESETS.find((p) => p.id === id);
-                if (!preset) return;
-                setScene({
-                  kind: "Animation",
-                  themeId: preset.themeId,
-                  effectId: preset.effectId,
-                  speed: themeSpeed,
-                });
-              }}
-              renderItem={(item) => {
-                const preset = THEME_PRESETS.find((p) => p.id === item.id);
-                return (
+        {/* ── Stills ───────────────────────────────────────────────────── */}
+        {(listed("Stills") || hits?.stills.length) && (
+          <Section title="Stills" action={<Count n={SCENE_COUNTS.stills} />}>
+            <div className="grid grid-cols-2 gap-2.5">
+              {(hits?.stills ?? STILL_SCENES).map((still) => (
+                <Tile
+                  key={still.id}
+                  label={still.label}
+                  on={scene.kind === "Stills" && scene.id === still.id}
+                  wide
+                  onPick={() => setScene({ kind: "Stills", id: still.id })}
+                >
                   <span
                     className="absolute inset-0"
                     style={{
-                      backgroundImage: themeTint(
-                        preset?.themeId ?? THEME_PRESETS[0].themeId,
-                      ),
+                      backgroundImage: `linear-gradient(145deg, ${findStill(still.id).gradient})`,
                     }}
                   />
-                );
-              }}
-            />
+                </Tile>
+              ))}
+            </div>
           </Section>
         )}
-
-        {showing("Animation") && (
-          <>
-            <Section
-              title="Theme"
-              action={
-                <span className="text-[11.5px] font-medium text-brand-red">
-                  {activePreset ? activePreset.label : "Custom"}
-                </span>
-              }
-            >
-              <p className="mb-2.5 text-[12px] leading-snug text-ink-faint">
-                {describeTheme(themeId, effectId)} — mix any theme with any
-                effect, or start from a preset above.
-              </p>
-              <PillGrid
-                items={THEME_VARIATIONS.map((v) => ({ id: v.id, label: v.label }))}
-                activeId={themeId}
-                onPick={(id) =>
-                  setScene({
-                    kind: "Animation",
-                    themeId: id,
-                    effectId,
-                    speed: themeSpeed,
-                  })
-                }
-              />
-            </Section>
-
-            <Section title="Effect" action={<Count n={THEME_EFFECTS.length + 1} />}>
-              <PillGrid
-                items={[
-                  { id: "__none", label: "None" },
-                  ...THEME_EFFECTS.map((e) => ({ id: e.id, label: e.label })),
-                ]}
-                activeId={effectId ?? "__none"}
-                onPick={(id) =>
-                  setScene({
-                    kind: "Animation",
-                    themeId,
-                    effectId: id === "__none" ? null : id,
-                    speed: themeSpeed,
-                  })
-                }
-              />
-            </Section>
-
-            <SpeedControl
-              value={themeSpeed}
-              onChange={(speed) =>
-                setScene({ kind: "Animation", themeId, effectId, speed })
-              }
-            />
-          </>
-        )}
-
-        {/* ── Flat assets ──────────────────────────────────────────────── */}
-        {(["Video BG", "Stills"] as const).map((kind) => {
-          const items = (hits?.assets ?? ASSET_SCENES).filter((a) => a.kind === kind);
-          if (!items.length || (!q && !listed(kind))) return null;
-          return (
-            <Section
-              key={kind}
-              title={kind === "Video BG" ? "Video BG · cinematic" : "Stills"}
-              action={
-                <Count
-                  n={kind === "Video BG" ? SCENE_COUNTS.video : SCENE_COUNTS.stills}
-                />
-              }
-            >
-              <div className="grid grid-cols-2 gap-2.5">
-                {items.map((asset) => (
-                  <Tile
-                    key={asset.id}
-                    label={asset.label}
-                    on={
-                      (scene.kind === "Video BG" || scene.kind === "Stills") &&
-                      scene.id === asset.id
-                    }
-                    wide
-                    onPick={() => setScene({ kind: asset.kind, id: asset.id })}
-                  >
-                    <span
-                      className="absolute inset-0"
-                      style={{
-                        backgroundImage: `linear-gradient(145deg, ${asset.gradient})`,
-                      }}
-                    />
-                  </Tile>
-                ))}
-              </div>
-            </Section>
-          );
-        })}
 
         <Section>
           <p className="rounded-[12px] bg-surface-sunken/70 p-3 text-[12px] leading-snug text-ink-faint">
@@ -365,6 +411,50 @@ export function BackgroundPanel() {
         </Section>
       </motion.div>
     </PanelBody>
+  );
+}
+
+/**
+ * A slide in the Recommended row, which mixes all three generated kinds — so it
+ * has to dispatch on the scene rather than assume one renderer.
+ */
+function ScenePreview({ scene }: { scene: Scene }) {
+  if (scene.kind === "Gradient") {
+    return (
+      <GradientBackground
+        styleId={scene.styleId}
+        palette={PALETTES.find((p) => p.id === scene.paletteId) ?? PALETTES[0]}
+        maxDimension={220}
+        speed={Math.min(scene.speed, 20)}
+      />
+    );
+  }
+  if (scene.kind === "Animation") {
+    return (
+      <span
+        className="absolute inset-0"
+        style={{ backgroundImage: themeTint(scene.themeId) }}
+      />
+    );
+  }
+  if (scene.kind === "Video") {
+    return (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img
+        src={findVideoBackground(scene.id).src}
+        alt=""
+        draggable={false}
+        className="h-full w-full object-cover"
+      />
+    );
+  }
+  return (
+    <span
+      className="absolute inset-0"
+      style={{
+        backgroundImage: `linear-gradient(145deg, ${findStill(scene.id).gradient})`,
+      }}
+    />
   );
 }
 

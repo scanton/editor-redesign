@@ -4,7 +4,8 @@ import { motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
 import { GradientBackground } from "@/components/canvas/gradient-background";
-import { describeScene, findAssetScene } from "@/lib/digital-card";
+import { describeScene, findStill } from "@/lib/digital-card";
+import { findVideoBackground } from "@/lib/video-backgrounds";
 import { PALETTES } from "@/lib/gradient-palettes";
 import { useEditorStore } from "@/store/editor-store";
 
@@ -62,7 +63,19 @@ export function SceneLayer() {
         />
       )}
 
-      {(scene.kind === "Video BG" || scene.kind === "Stills") && (
+      {scene.kind === "Video" && (
+        <motion.img
+          key={scene.id}
+          src={findVideoBackground(scene.id).src}
+          alt=""
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.4 }}
+          className="absolute inset-0 h-full w-full object-cover"
+        />
+      )}
+
+      {scene.kind === "Stills" && (
         <motion.div
           key={scene.id}
           initial={{ opacity: 0 }}
@@ -70,7 +83,7 @@ export function SceneLayer() {
           transition={{ duration: 0.4 }}
           className="absolute inset-0"
           style={{
-            backgroundImage: `linear-gradient(145deg, ${findAssetScene(scene.id).gradient})`,
+            backgroundImage: `linear-gradient(145deg, ${findStill(scene.id).gradient})`,
           }}
         />
       )}

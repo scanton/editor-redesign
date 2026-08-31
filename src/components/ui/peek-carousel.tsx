@@ -55,10 +55,12 @@ export function PeekCarousel({
   // The selection is the centre slide, so the virtual index is derived from it
   // rather than stored: laps counts how far the user has wrapped, and the
   // remainder is whichever item is selected.
-  const selectedIndex = Math.max(
-    0,
-    items.findIndex((i) => i.id === selectedId),
-  );
+  // A row can be showing a list the current selection is not in — the mixed
+  // Recommended row, say, while a video from the full library is set. Centre
+  // the first item then, but do not claim it as selected.
+  const foundIndex = items.findIndex((i) => i.id === selectedId);
+  const hasSelection = foundIndex >= 0;
+  const selectedIndex = hasSelection ? foundIndex : 0;
   const [laps, setLaps] = useState(0);
   const index = laps * items.length + selectedIndex;
 
@@ -145,7 +147,7 @@ export function PeekCarousel({
               id={`peek-${label}-${i}`}
               type="button"
               role="option"
-              aria-selected={isCentre}
+              aria-selected={isCentre && hasSelection}
               aria-label={item.label}
               onClick={() => {
                 if (Math.abs(dragPx) < 5) move(i);
@@ -167,7 +169,7 @@ export function PeekCarousel({
             >
               {renderItem(item, isCentre)}
 
-              {isCentre && (
+              {isCentre && hasSelection && (
                 <span className="pointer-events-none absolute inset-0 rounded-[10px] ring-2 ring-inset ring-brand-red" />
               )}
 

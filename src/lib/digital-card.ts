@@ -5,6 +5,7 @@ import {
   describeTheme,
   matchPreset,
 } from "./themes";
+import { VIDEO_BACKGROUNDS, findVideoBackground } from "./video-backgrounds";
 
 /**
  * The digital card's presentation layer: the scene it sits in, the envelope it
@@ -17,63 +18,67 @@ import {
  * described by their parameters rather than picked from a fixed list; video and
  * stills come from the asset library.
  */
-export type BackgroundKind = "Gradient" | "Animation" | "Video BG" | "Stills";
+export type BackgroundKind = "Video" | "Animation" | "Gradient" | "Stills";
 
 export type Scene =
   | { kind: "Gradient"; styleId: string; paletteId: string; speed: number }
   | { kind: "Animation"; themeId: string; effectId: string | null; speed: number }
-  | { kind: "Video BG" | "Stills"; id: string };
+  | { kind: "Video"; id: string }
+  | { kind: "Stills"; id: string };
 
-/**
- * Video and stills are flat assets rather than generated scenes. These are the
- * ones the current library ships.
- */
-export const ASSET_SCENES: {
-  id: string;
-  label: string;
-  kind: "Video BG" | "Stills";
-  gradient: string;
-}[] = [
-  {
-    id: "rosegold",
-    label: "Rose Gold Confetti",
-    kind: "Video BG",
-    gradient: "#f7c9b8, #d98b6f",
-  },
-  {
-    id: "blue",
-    label: "Liquid Cobalt",
-    kind: "Video BG",
-    gradient: "#1f3fd8, #7fb2e5",
-  },
-  { id: "holiday", label: "Holiday", kind: "Stills", gradient: "#1a1030, #c9a227" },
-  { id: "autumn", label: "Autumn", kind: "Stills", gradient: "#b2451d, #e8a33d" },
+/** Stills are flat images; the library currently ships two. */
+export const STILL_SCENES: { id: string; label: string; gradient: string }[] = [
+  { id: "holiday", label: "Holiday", gradient: "#1a1030, #c9a227" },
+  { id: "autumn", label: "Autumn", gradient: "#b2451d, #e8a33d" },
 ];
 
+/** Ordered as the panel presents them. */
 export const BACKGROUND_TABS: ("All" | BackgroundKind)[] = [
   "All",
-  "Gradient",
+  "Video",
   "Animation",
-  "Video BG",
+  "Gradient",
   "Stills",
 ];
 
 export const SCENE_COUNTS = {
-  gradient: GRADIENT_STYLES.length * PALETTES.length,
+  video: VIDEO_BACKGROUNDS.length,
   themes: THEME_COMBINATIONS,
-  /** The video library is larger than what the panel lists. */
-  video: 450,
-  stills: ASSET_SCENES.filter((s) => s.kind === "Stills").length,
+  gradient: GRADIENT_STYLES.length * PALETTES.length,
+  stills: STILL_SCENES.length,
 };
 
 export const TOTAL_BACKGROUNDS =
-  SCENE_COUNTS.gradient +
-  SCENE_COUNTS.themes +
   SCENE_COUNTS.video +
+  SCENE_COUNTS.themes +
+  SCENE_COUNTS.gradient +
   SCENE_COUNTS.stills;
 
-export function findAssetScene(id: string) {
-  return ASSET_SCENES.find((s) => s.id === id) ?? ASSET_SCENES[0];
+/**
+ * What we lead with. In production this is driven by the card's occasion and
+ * palette; here it is a hand-picked spread so the row shows all three kinds.
+ */
+export const RECOMMENDED: Scene[] = [
+  { kind: "Video", id: "graduation-cap-toss-gold" },
+  { kind: "Animation", themeId: "confetti", effectId: "balloons", speed: 60 },
+  { kind: "Gradient", styleId: "aurora", paletteId: "northern-lights", speed: 12 },
+  { kind: "Video", id: "celebration-edm-rave-festival" },
+  { kind: "Animation", themeId: "starfield", effectId: "magic-dust", speed: 60 },
+  { kind: "Video", id: "anniversary-rose-gold-confetti" },
+  { kind: "Gradient", styleId: "halo", paletteId: "golden-hour", speed: 12 },
+  { kind: "Video", id: "birthday-neon-party-glow" },
+  { kind: "Animation", themeId: "tie-dye", effectId: "butterflies", speed: 60 },
+];
+
+export function findStill(id: string) {
+  return STILL_SCENES.find((s) => s.id === id) ?? STILL_SCENES[0];
+}
+
+/** Stable key for a scene, so a mixed list can compare selections. */
+export function sceneKey(scene: Scene): string {
+  if (scene.kind === "Gradient") return `gradient:${scene.styleId}:${scene.paletteId}`;
+  if (scene.kind === "Animation") return `animation:${scene.themeId}:${scene.effectId ?? "none"}`;
+  return `${scene.kind.toLowerCase()}:${scene.id}`;
 }
 
 /** One-line description of whatever scene is set. */
@@ -89,7 +94,8 @@ export function describeScene(scene: Scene): string {
       describeTheme(scene.themeId, scene.effectId)
     );
   }
-  return findAssetScene(scene.id).label;
+  if (scene.kind === "Video") return findVideoBackground(scene.id).label;
+  return findStill(scene.id).label;
 }
 
 /* ─────────────────────────────────────────────── envelope looks ── */
