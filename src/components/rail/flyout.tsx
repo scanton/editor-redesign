@@ -6,6 +6,9 @@ import { IconButton } from "@/components/ui/icon-button";
 import { TOOLS } from "@/components/rail/tools";
 import { BackgroundPanel } from "@/components/rail/panels/background-panel";
 import { CardTypePanel } from "@/components/rail/panels/card-type-panel";
+import { DeliveryPanel } from "@/components/rail/panels/delivery-panel";
+import { PrintOptionsPanel } from "@/components/rail/panels/print-options-panel";
+import { RecipientsPanel } from "@/components/rail/panels/recipients-panel";
 import { CoverPanel } from "@/components/rail/panels/cover-panel";
 import { EnvelopePanel } from "@/components/rail/panels/envelope-panel";
 import { LongFormPanel } from "@/components/rail/panels/long-form-panel";
@@ -31,6 +34,9 @@ const PANELS: Record<ToolId, React.ComponentType> = {
   envelope: EnvelopePanel,
   reveal: RevealPanel,
   cover: CoverPanel,
+  delivery: DeliveryPanel,
+  recipients: RecipientsPanel,
+  printopts: PrintOptionsPanel,
   review: ReviewPanel,
 };
 

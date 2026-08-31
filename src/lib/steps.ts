@@ -22,13 +22,17 @@ export function stepTools(step: Step, cardType: CardType): ToolId[] {
     return cardType === "digital"
       ? ["cardtype", "background", "envelope", "reveal", "cover"]
       : ["cardtype", "envelope"];
-  return ["review"];
+  return cardType === "digital"
+    ? ["delivery", "recipients", "review"]
+    : ["delivery", "recipients", "printopts", "review"];
 }
 
 const DIGITAL_ONLY: ToolId[] = ["background", "reveal", "cover"];
 
+const FINISH_TOOLS: ToolId[] = ["delivery", "recipients", "printopts", "review"];
+
 export function stepOf(tool: ToolId): Step {
-  if (tool === "review") return 3;
+  if (FINISH_TOOLS.includes(tool)) return 3;
   if (tool === "cardtype" || tool === "envelope" || DIGITAL_ONLY.includes(tool))
     return 2;
   return 1;

@@ -26,6 +26,12 @@ import type {
 } from "@/lib/types";
 import { boundsOf } from "@/lib/lasso";
 import { stepTools } from "@/lib/steps";
+import type {
+  DigitalDelivery,
+  PrintedDelivery,
+  Recipient,
+} from "@/lib/fulfilment";
+import { CARD_TYPES } from "@/lib/pricing";
 import { clamp, uid } from "@/lib/utils";
 
 const MAX_HISTORY = 50;
@@ -78,6 +84,24 @@ type EditorState = {
     };
   };
   setDigital: (patch: Partial<EditorState["digital"]>) => void;
+
+  /** Finish: how it reaches them, who gets it, and what that costs. */
+  fulfilment: {
+    digitalDelivery: DigitalDelivery;
+    printedDelivery: PrintedDelivery;
+    recipients: Recipient[];
+    quantity: number;
+    stock: string;
+    corners: string;
+  };
+  setFulfilment: (patch: Partial<EditorState["fulfilment"]>) => void;
+  addRecipient: () => void;
+  updateRecipient: (id: string, patch: Partial<Recipient>) => void;
+  removeRecipient: (id: string) => void;
+  /** Both renditions can end up in the same order. */
+  alsoInCart: boolean;
+  setAlsoInCart: (value: boolean) => void;
+  orderTotal: () => number;
   setReveal: (patch: Partial<EditorState["digital"]["reveal"]>) => void;
   setCover: (patch: Partial<EditorState["digital"]["cover"]>) => void;
   toggleRevealStep: (id: string) => void;
@@ -199,6 +223,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       step,
       activeTool: keeps ? tool : null,
+      agentOpen: step !== 3,
       canvasMode: "element",
       draftAnnotation: null,
       draftLasso: null,
@@ -242,6 +267,74 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     },
   },
   setDigital: (patch) => set((s) => ({ digital: { ...s.digital, ...patch } })),
+
+  fulfilment: {
+    digitalDelivery: "link",
+    printedDelivery: "mail",
+    recipients: [
+      {
+        id: "r1",
+        name: "Trish Sparks",
+        email: "trish@sparks.co",
+        line1: "129 E. Fremont Dr.",
+        line2: "Las Vegas, NV 89101",
+      },
+    ],
+    quantity: 1,
+    stock: "matte",
+    corners: "square",
+  },
+  setFulfilment: (patch) =>
+    set((s) => ({ fulfilment: { ...s.fulfilment, ...patch } })),
+  addRecipient: () =>
+    set((s) => ({
+      fulfilment: {
+        ...s.fulfilment,
+        recipients: [
+          ...s.fulfilment.recipients,
+          { id: uid("rcp"), name: "", email: "", line1: "", line2: "" },
+        ],
+      },
+    })),
+  updateRecipient: (id, patch) =>
+    set((s) => ({
+      fulfilment: {
+        ...s.fulfilment,
+        recipients: s.fulfilment.recipients.map((r) =>
+          r.id === id ? { ...r, ...patch } : r,
+        ),
+      },
+    })),
+  removeRecipient: (id) =>
+    set((s) => ({
+      fulfilment: {
+        ...s.fulfilment,
+        // Never leave the list empty — there is always someone to send to.
+        recipients:
+          s.fulfilment.recipients.length > 1
+            ? s.fulfilment.recipients.filter((r) => r.id !== id)
+            : s.fulfilment.recipients,
+      },
+    })),
+  alsoInCart: false,
+  setAlsoInCart: (alsoInCart) => set({ alsoInCart }),
+
+  // Digital is priced per recipient because each one gets their own link;
+  // print is priced per copy.
+  orderTotal: () => {
+    const { cardType, fulfilment, alsoInCart } = get();
+    const unit = (id: "digital" | "printed") =>
+      CARD_TYPES.find((t) => t.id === id)!.unit;
+    const digitalSum = unit("digital") * fulfilment.recipients.length;
+    const printedSum = unit("printed") * fulfilment.quantity;
+    const primary = cardType === "digital" ? digitalSum : printedSum;
+    const extra = alsoInCart
+      ? cardType === "digital"
+        ? printedSum
+        : digitalSum
+      : 0;
+    return primary + extra;
+  },
   setReveal: (patch) =>
     set((s) => ({
       digital: { ...s.digital, reveal: { ...s.digital.reveal, ...patch } },

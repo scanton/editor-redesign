@@ -29,6 +29,8 @@ export function CanvasArea() {
     (s) => s.cardType === "digital" && s.surface === "card",
   );
   const setViewport = useEditorStore((s) => s.setViewport);
+  // Finish is checkout — nothing on the card is editable from there.
+  const editing = useEditorStore((s) => s.step !== 3);
 
   useEffect(() => {
     const host = hostRef.current;
@@ -82,7 +84,7 @@ export function CanvasArea() {
       <AnimatePresence>
         {/* No marking up an envelope — but the switcher has to stay, or the
             envelope face becomes a room with no door back to the card. */}
-        {!showEnvelope && <CanvasTools key="tools" />}
+        {editing && !showEnvelope && <CanvasTools key="tools" />}
       </AnimatePresence>
       <FaceSwitcher />
     </div>

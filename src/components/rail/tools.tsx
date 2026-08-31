@@ -1,5 +1,8 @@
 import {
   ImagePlay,
+  MapPin,
+  Printer,
+  Send,
   Languages,
   LayoutTemplate,
   Mail,
@@ -86,6 +89,24 @@ export const TOOLS: ToolDef[] = [
     label: "Cover",
     icon: LayoutTemplate,
     blurb: "Read before the envelope opens.",
+  },
+  {
+    id: "delivery",
+    label: "Delivery",
+    icon: Send,
+    blurb: "How it reaches them.",
+  },
+  {
+    id: "recipients",
+    label: "Recipients",
+    icon: MapPin,
+    blurb: "Who gets it.",
+  },
+  {
+    id: "printopts",
+    label: "Print options",
+    icon: Printer,
+    blurb: "Stock, corners and quantity.",
   },
   {
     id: "review",

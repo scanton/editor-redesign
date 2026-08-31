@@ -11,6 +11,9 @@ export type ToolId =
   | "envelope"
   | "reveal"
   | "cover"
+  | "delivery"
+  | "recipients"
+  | "printopts"
   | "review";
 
 /** The canvas shows one of these at a time. */
