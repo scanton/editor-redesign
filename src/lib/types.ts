@@ -6,7 +6,14 @@ export type ToolId =
   | "signature"
   | "translations"
   | "longform"
-  | "envelope";
+  | "cardtype"
+  | "envelope"
+  | "review";
+
+export type Step = 1 | 2 | 3;
+
+/** A card exists as both renditions at once; this is the one being edited. */
+export type CardType = "digital" | "printed";
 
 export type BaseNode = {
   id: string;
@@ -91,7 +98,7 @@ export type AnnotationRect = {
 };
 
 /** What the pointer does on the canvas. */
-export type CanvasMode = "select" | "annotate" | "wand" | "eraser";
+export type CanvasMode = "element" | "annotate" | "wand" | "eraser";
 
 /**
  * A region the user marked out, plus what they want changed there. Boxed
@@ -105,6 +112,8 @@ export type AnnotationRequest = {
   rect: AnnotationRect;
   /** Flat [x0, y0, …] in card coordinates. Present for freehand regions. */
   points?: number[];
+  /** Set when the region came from clicking a segment rather than drawing one. */
+  segmentLabel?: string;
   /** Brush strokes, one flat point list each. Present for erase requests. */
   strokes?: number[][];
   brushSize?: number;
@@ -121,6 +130,17 @@ export type Envelope = {
   recipient: Address;
 };
 
+/**
+ * A region the segmentation model found in the rendered artwork. Clicking one
+ * hands its outline to the agent without the customer having to trace it.
+ */
+export type Segment = {
+  id: string;
+  label: string;
+  /** Flat [x0, y0, …] outline in card coordinates. */
+  points: number[];
+};
+
 export type Face = {
   id: FaceId;
   label: string;
@@ -134,6 +154,11 @@ export type Face = {
   /** Optional second color — renders as a soft vertical gradient. */
   backgroundAccent?: string;
   nodes: EditorNode[];
+  /**
+   * Ordered most-specific first: hit-testing takes the first match, so a figure
+   * standing on a background is picked before the background it stands on.
+   */
+  segments?: Segment[];
 };
 
 export type CardDoc = {

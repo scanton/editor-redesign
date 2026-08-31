@@ -1,12 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import {
-  Eraser,
-  Lasso,
-  MousePointer2,
-  SquareDashedMousePointer,
-} from "lucide-react";
+import { Eraser, Lasso, Scan, SquareDashedMousePointer } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { CanvasMode } from "@/lib/types";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -23,10 +18,10 @@ type Mode = {
 
 const MODES: Mode[] = [
   {
-    id: "select",
-    label: "Select",
-    hint: "Move and resize what sits on the card",
-    icon: MousePointer2,
+    id: "element",
+    label: "Element",
+    hint: "Click anything the model found — a face, the type, the background",
+    icon: Scan,
   },
   {
     id: "annotate",

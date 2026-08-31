@@ -16,7 +16,13 @@ import {
   toCardPoint,
   toScreenRect,
 } from "@/lib/card-transform";
-import { appendPoint, boundsOf, rectToSvgPoints, toSvgPoints } from "@/lib/lasso";
+import {
+  appendPoint,
+  boundsOf,
+  pointInPolygon,
+  rectToSvgPoints,
+  toSvgPoints,
+} from "@/lib/lasso";
 import type { AnnotationRect } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
 import { clamp } from "@/lib/utils";
@@ -27,10 +33,11 @@ const PROMPT_WIDTH = 288;
 const PROMPT_GAP = 12;
 
 /**
- * Marking out a region of the card to hand to the agent. Two shapes share this
- * layer because everything after the gesture is identical — the spotlight, the
- * prompt, the submit, the re-render shimmer:
+ * Marking out a region of the card to hand to the agent. Three ways in, one
+ * outcome — the spotlight, the prompt, the submit and the re-render shimmer are
+ * identical whichever you used:
  *
+ *   element  — click a segment the model already found
  *   annotate — drag a rectangle
  *   wand     — trace any shape freehand
  *
@@ -51,6 +58,9 @@ export function RegionLayer({
   const setLasso = useEditorStore((s) => s.setDraftLasso);
   const submit = useEditorStore((s) => s.submitAnnotation);
   const requests = useEditorStore((s) => s.annotationRequests);
+  const hoverSegment = useEditorStore((s) => s.hoverSegment);
+  const setHoverSegment = useEditorStore((s) => s.setHoverSegment);
+  const selectSegment = useEditorStore((s) => s.selectSegment);
 
   const hostRef = useRef<HTMLDivElement>(null);
   const originRef = useRef<{ x: number; y: number } | null>(null);
@@ -64,7 +74,11 @@ export function RegionLayer({
   const [drawing, setDrawing] = useState(false);
   const maskId = useId();
 
-  const marking = mode === "annotate" || mode === "wand";
+  const drawingMode = mode === "annotate" || mode === "wand";
+  const picking = mode === "element";
+  const marking = drawingMode || picking;
+  const segments = face.segments ?? [];
+  const hovered = segments.find((seg) => seg.id === hoverSegment) ?? null;
   const transform = cardTransform(viewport, face, zoom);
 
   // Regions the agent is "re-rendering" right now, on this face.
@@ -87,11 +101,11 @@ export function RegionLayer({
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       if (draft) cancel();
-      else setMode("select");
+      else if (mode !== "element") setMode("element");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [marking, draft, cancel, setMode]);
+  }, [marking, draft, mode, cancel, setMode]);
 
   const localPoint = (e: ReactPointerEvent) => {
     const rect = hostRef.current!.getBoundingClientRect();
@@ -104,8 +118,21 @@ export function RegionLayer({
     y: clamp(p.y, 0, face.height),
   });
 
+  /** Topmost segment under a card-space point; segments are most-specific first. */
+  const segmentAt = (p: { x: number; y: number }) =>
+    segments.find((seg) => pointInPolygon(p.x, p.y, seg.points)) ?? null;
+
   const onPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
-    if (!marking || draft) return;
+    if (draft) return;
+
+    // Element mode is a click, not a drag: the outline already exists.
+    if (picking) {
+      const hit = segmentAt(clampToCard(toCardPoint(localPoint(e), transform)));
+      if (hit) selectSegment(hit);
+      return;
+    }
+
+    if (!drawingMode) return;
     // Throws NotFoundError if the pointer is already gone; not worth failing over.
     try {
       e.currentTarget.setPointerCapture(e.pointerId);
@@ -125,6 +152,13 @@ export function RegionLayer({
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (picking) {
+      if (draft) return;
+      const hit = segmentAt(clampToCard(toCardPoint(localPoint(e), transform)));
+      setHoverSegment(hit?.id ?? null);
+      return;
+    }
+
     const origin = originRef.current;
     if (!origin) return;
     const current = clampToCard(toCardPoint(localPoint(e), transform));
@@ -168,16 +202,25 @@ export function RegionLayer({
         ? rectToSvgPoints(draft, transform)
         : null;
 
+  /** What the spotlight cuts out: the committed region, else what's under the pointer. */
+  const spotlightShape =
+    draftShape ?? (hovered ? toSvgPoints(hovered.points, transform) : null);
+
+  // In Element mode the hint names what you are about to pick; in the drawing
+  // modes it explains the gesture. With neither, it stays out of the way.
+  const showHint = !draft && (drawingMode || Boolean(hovered));
+
   return (
     <div
       ref={hostRef}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
+      onPointerLeave={() => setHoverSegment(null)}
       className="absolute inset-0 z-20"
       style={{
         pointerEvents: marking || draft ? "auto" : "none",
-        cursor: marking && !draft ? "crosshair" : "default",
+        cursor: !marking || draft ? "default" : picking ? "pointer" : "crosshair",
       }}
     >
       {/* Spotlight + outlines. One SVG covers both shapes: the marked region is
@@ -186,12 +229,16 @@ export function RegionLayer({
         <defs>
           <mask id={maskId}>
             <rect width="100%" height="100%" fill="white" />
-            {draftShape && <polygon points={draftShape} fill="black" />}
+            {spotlightShape && (
+              <polygon points={spotlightShape} fill="black" />
+            )}
           </mask>
         </defs>
 
         <AnimatePresence>
-          {marking && (
+          {/* Element is the resting mode, so it only dims once you are actually
+              pointing at something. The drawing modes dim on entry. */}
+          {(drawingMode || spotlightShape) && (
             <motion.rect
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -205,10 +252,21 @@ export function RegionLayer({
           )}
         </AnimatePresence>
 
+        {!draftShape && hovered && (
+          <polygon
+            points={toSvgPoints(hovered.points, transform)}
+            fill="rgb(190 29 44 / 0.06)"
+            stroke="var(--color-brand-red)"
+            strokeWidth={2}
+            strokeDasharray="7 5"
+            strokeLinejoin="round"
+          />
+        )}
+
         {draftShape && (
           <polygon
             points={draftShape}
-            fill="rgb(213 35 43 / 0.08)"
+            fill="rgb(190 29 44 / 0.08)"
             stroke="var(--color-brand-red)"
             strokeWidth={2}
             strokeLinejoin="round"
@@ -313,7 +371,7 @@ export function RegionLayer({
 
       {/* Mode hint. Sits clear of the toolbar, which owns top-centre. */}
       <AnimatePresence>
-        {marking && !draft && (
+        {showHint && (
           <motion.p
             initial={{ opacity: 0, y: 8 }}
             animate={{ opacity: 1, y: 0 }}
@@ -321,9 +379,11 @@ export function RegionLayer({
             transition={springBouncy}
             className="pointer-events-none absolute left-1/2 top-[84px] -translate-x-1/2 rounded-full bg-ink px-3.5 py-1.5 text-[12.5px] font-medium text-white shadow-pop"
           >
-            {mode === "wand"
-              ? "Draw around what you want changed · Esc to exit"
-              : "Drag a box around what you want changed · Esc to exit"}
+            {mode === "element"
+              ? hovered?.label + " · click to edit it"
+              : mode === "wand"
+                ? "Draw around what you want changed · Esc to exit"
+                : "Drag a box around what you want changed · Esc to exit"}
           </motion.p>
         )}
       </AnimatePresence>

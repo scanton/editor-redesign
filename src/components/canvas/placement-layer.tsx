@@ -3,18 +3,9 @@
 import { motion } from "motion/react";
 import { useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { springBouncy } from "@/lib/motion";
-import {
-  cardTransform,
-  toCardPoint,
-  toScreenRect,
-} from "@/lib/card-transform";
-import {
-  CUT_SAFE_MARGIN,
-  PX_PER_INCH,
-  findLongForm,
-  safeArea,
-} from "@/lib/long-form";
-import { LONG_FORM_NODE_ID, useEditorStore } from "@/store/editor-store";
+import { cardTransform, toCardPoint, toScreenRect } from "@/lib/card-transform";
+import { CUT_SAFE_MARGIN, PX_PER_INCH, safeArea } from "@/lib/long-form";
+import { useEditorStore } from "@/store/editor-store";
 import type { AnnotationRect } from "@/lib/types";
 import { clamp } from "@/lib/utils";
 
@@ -30,20 +21,28 @@ const HANDLES: { id: Handle; className: string; cursor: string }[] = [
 ];
 
 /**
- * Where the long-form block will be printed. Drag to move, corners to resize,
- * clamped to the trim-safe area — you can't place text where the cutter will
- * take it. Shown only while the Long-Form Text panel is open.
+ * Where a block will be printed. Drag to move, corners to resize, clamped to the
+ * trim-safe area — you can't place anything where the cutter will take it.
+ *
+ * Used by whichever panel owns a placeable piece: the long-form block, and the
+ * signature (which is why the canvas no longer needs a Select tool).
  */
 export function PlacementLayer({
   viewport,
+  rect,
+  onChange,
+  onCommit,
+  label,
+  showTrimNote = true,
 }: {
   viewport: { width: number; height: number };
+  rect: AnnotationRect;
+  onChange: (rect: AnnotationRect) => void;
+  onCommit?: (rect: AnnotationRect) => void;
+  label: string;
+  showTrimNote?: boolean;
 }) {
-  const longForm = useEditorStore((s) => s.longForm);
-  const setLongForm = useEditorStore((s) => s.setLongForm);
-  const updateNode = useEditorStore((s) => s.updateNode);
   const face = useEditorStore((s) => s.doc.faces[s.face]);
-  const faceId = useEditorStore((s) => s.face);
   const zoom = useEditorStore((s) => s.zoom);
 
   const hostRef = useRef<HTMLDivElement>(null);
@@ -52,15 +51,12 @@ export function PlacementLayer({
     origin: { x: number; y: number };
     start: AnnotationRect;
   } | null>(null);
-
-  // The block belongs to one face; don't draw its box over a different one.
-  if (faceId !== longForm.face) return null;
+  const latestRef = useRef<AnnotationRect | null>(null);
 
   const transform = cardTransform(viewport, face, zoom);
   const safe = safeArea(face);
-  const box = toScreenRect(longForm.rect, transform);
+  const box = toScreenRect(rect, transform);
   const safeBox = toScreenRect(safe, transform);
-  const option = findLongForm(longForm.kind);
 
   const pointIn = (e: ReactPointerEvent) => {
     const host = hostRef.current!.getBoundingClientRect();
@@ -75,11 +71,7 @@ export function PlacementLayer({
     try {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
     } catch {}
-    dragRef.current = {
-      mode,
-      origin: pointIn(e),
-      start: { ...longForm.rect },
-    };
+    dragRef.current = { mode, origin: pointIn(e), start: { ...rect } };
   };
 
   const move = (e: ReactPointerEvent) => {
@@ -89,23 +81,16 @@ export function PlacementLayer({
     const dx = now.x - drag.origin.x;
     const dy = now.y - drag.origin.y;
     const next = resize(drag.mode, drag.start, dx, dy, safe);
-    setLongForm({ rect: next });
+    latestRef.current = next;
+    onChange(next);
   };
 
   const end = () => {
     if (!dragRef.current) return;
     dragRef.current = null;
-    // Read through the store rather than the render closure: the last
-    // pointermove may not have re-rendered yet when pointerup lands.
-    const current = useEditorStore.getState().longForm;
-    // Keep an already-written block glued to its box.
-    if (current.status === "placed") {
-      updateNode(
-        LONG_FORM_NODE_ID,
-        { x: current.rect.x, y: current.rect.y, width: current.rect.width },
-        true,
-      );
-    }
+    // The last pointermove may not have re-rendered yet, so commit from the ref
+    // rather than the render closure.
+    onCommit?.(latestRef.current ?? rect);
   };
 
   return (
@@ -144,7 +129,7 @@ export function PlacementLayer({
         style={box}
       >
         <span className="absolute -top-7 left-0 whitespace-nowrap rounded-full bg-brand-red px-2.5 py-1 text-[11px] font-semibold text-white">
-          {option ? option.label : "Long-form text"}
+          {label}
         </span>
 
         {HANDLES.map((handle) => (
@@ -161,15 +146,18 @@ export function PlacementLayer({
       </motion.div>
 
       {/* Sits below the card, not on the artwork, so it stays readable. */}
-      <p
-        className="absolute whitespace-nowrap rounded-full bg-surface/85 px-2.5 py-1 text-[11px] font-medium text-ink-soft shadow-rail backdrop-blur"
-        style={{
-          left: transform.x,
-          top: transform.y + face.height * transform.scale + 10,
-        }}
-      >
-        Dashed line = {(CUT_SAFE_MARGIN / PX_PER_INCH).toFixed(1)}″ trim-safe area
-      </p>
+      {showTrimNote && (
+        <p
+          className="absolute whitespace-nowrap rounded-full bg-surface/85 px-2.5 py-1 text-[11px] font-medium text-ink-soft shadow-rail backdrop-blur"
+          style={{
+            left: transform.x,
+            top: transform.y + face.height * transform.scale + 10,
+          }}
+        >
+          Dashed line = {(CUT_SAFE_MARGIN / PX_PER_INCH).toFixed(1)}″ trim-safe
+          area
+        </p>
+      )}
     </div>
   );
 }
@@ -207,7 +195,11 @@ function resize(
   }
 
   if (north) {
-    const nextY = clamp(start.y + dy, safe.y, start.y + start.height - MIN_SIZE);
+    const nextY = clamp(
+      start.y + dy,
+      safe.y,
+      start.y + start.height - MIN_SIZE,
+    );
     height = start.y + start.height - nextY;
     y = nextY;
   } else {

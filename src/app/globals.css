@@ -1,21 +1,22 @@
 @import "tailwindcss";
 
 @theme inline {
-  /* Brand */
-  --color-brand-red: #d5232b;
-  --color-brand-red-hover: #bd1c24;
-  --color-brand-pink: #ff9dc4;
-  --color-brand-pink-soft: #ffe3ee;
+  /* Brand — values taken from the production Figma token export, not eyeballed. */
+  --color-brand-red: #be1d2c;
+  --color-brand-red-hover: #d42031;
+  --color-brand-red-pressed: #a81a27;
+  --color-brand-pink: #f5bdc2;
+  --color-brand-pink-soft: rgb(245 189 194 / 0.3);
 
   /* Surfaces */
-  --color-ink: #16161a;
-  --color-ink-soft: #4b4b55;
-  --color-ink-faint: #8b8b96;
+  --color-ink: #242423;
+  --color-ink-soft: #6e6d6a;
+  --color-ink-faint: #a9a8a4;
   --color-surface: #ffffff;
-  --color-surface-sunken: #f3f4f7;
+  --color-surface-sunken: #f5f5f4;
   --color-surface-raised: #ffffff;
-  --color-hairline: #e6e7ec;
-  --color-hairline-strong: #d5d7de;
+  --color-hairline: rgb(36 36 35 / 0.1);
+  --color-hairline-strong: rgb(36 36 35 / 0.2);
 
   /* Radii */
   --radius-xs: 6px;
@@ -24,15 +25,17 @@
   --radius-lg: 20px;
   --radius-xl: 28px;
 
-  /* Typography */
-  --font-display: var(--font-fredoka);
-  --font-sans: var(--font-inter);
+  /* Typography — Stack Sans Text is proprietary and not on the web; Instrument
+     Sans is the fallback the production codebase already ships. */
+  --font-display: var(--font-instrument);
+  --font-sans: var(--font-dm-sans);
 
   /* Elevation */
-  --shadow-pop: 0 18px 40px -12px rgb(22 22 26 / 0.22), 0 2px 8px -2px rgb(22 22 26 / 0.1);
-  --shadow-rail: 0 8px 24px -10px rgb(22 22 26 / 0.18);
-  --shadow-card: 0 24px 60px -20px rgb(22 22 26 / 0.35);
+  --shadow-pop: 0 18px 40px -12px rgb(36 36 35 / 0.2), 0 2px 8px -2px rgb(36 36 35 / 0.09);
+  --shadow-rail: 0 8px 24px -10px rgb(36 36 35 / 0.16);
+  --shadow-card: 0 24px 60px -20px rgb(36 36 35 / 0.32);
 }
+
 
 :root {
   --rail-width: 84px;

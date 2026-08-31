@@ -14,6 +14,7 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Logo } from "@/components/chrome/logo";
+import { Stepper } from "@/components/chrome/stepper";
 import { springBouncy, springTight } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
 
@@ -29,7 +30,10 @@ export function TopBar() {
 
   return (
     <header className="relative z-30 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-3 border-b border-hairline bg-surface px-4">
-      <Logo />
+      <div className="flex min-w-0 items-center gap-6">
+        <Logo />
+        <Stepper />
+      </div>
 
       <div className="flex items-center gap-2">
         <motion.div

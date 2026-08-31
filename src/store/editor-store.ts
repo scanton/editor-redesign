@@ -13,6 +13,9 @@ import type {
   AnnotationRect,
   AnnotationRequest,
   CanvasMode,
+  CardType,
+  Segment,
+  Step,
   CardDoc,
   EditorNode,
   Envelope,
@@ -20,6 +23,7 @@ import type {
   ToolId,
 } from "@/lib/types";
 import { boundsOf } from "@/lib/lasso";
+import { STEP_TOOLS } from "@/lib/steps";
 import { clamp, uid } from "@/lib/utils";
 
 const MAX_HISTORY = 50;
@@ -37,8 +41,14 @@ const CANVAS_PADDING_Y = TOOLBAR_INSET + SWITCHER_INSET + 90;
 type EditorState = {
   doc: CardDoc;
   face: FaceId;
-  selectedId: string | null;
   activeTool: ToolId | null;
+
+  /** Create → Personalize → Finish. The rail regroups per step. */
+  step: Step;
+  setStep: (step: Step) => void;
+  /** One card, two saved renditions. Switching never discards the other. */
+  cardType: CardType;
+  setCardType: (type: CardType) => void;
   /** Flyout stays mounted but collapses when the rail is pinned closed. */
   railPinned: boolean;
   zoom: number;
@@ -49,7 +59,6 @@ type EditorState = {
   future: CardDoc[];
 
   setFace: (face: FaceId) => void;
-  select: (id: string | null) => void;
   setTool: (tool: ToolId | null) => void;
   toggleTool: (tool: ToolId) => void;
   setRailPinned: (pinned: boolean) => void;
@@ -72,9 +81,9 @@ type EditorState = {
   removeNode: (id: string) => void;
   addNode: (node: EditorNode, face?: FaceId) => void;
 
-  /** Styles panel is multi-select — a card can read as "photo + bold". */
+  /** One art style at a time — the library names are the real catalogue. */
   selectedStyles: string[];
-  toggleStyle: (id: string) => void;
+  setStyle: (id: string) => void;
 
   envelope: Envelope;
   updateEnvelope: (patch: Partial<Envelope>) => void;
@@ -90,6 +99,13 @@ type EditorState = {
   /** Freehand path being traced, in card coordinates. */
   draftLasso: number[] | null;
   setDraftLasso: (points: number[] | null) => void;
+  /** Segment under the pointer in Element mode. */
+  hoverSegment: string | null;
+  /** Name of the picked segment, if the region came from Element mode. */
+  draftSegmentLabel: string | null;
+  setHoverSegment: (id: string | null) => void;
+  /** Clicking a segment opens the same prompt drawing a region does. */
+  selectSegment: (segment: Segment) => void;
   annotationRequests: AnnotationRequest[];
   submitAnnotation: (instruction: string) => void;
   resolveAnnotation: (id: string) => void;
@@ -141,8 +157,24 @@ function cloneDoc(doc: CardDoc): CardDoc {
 export const useEditorStore = create<EditorState>((set, get) => ({
   doc: cloneDoc(sampleCard),
   face: "front",
-  selectedId: null,
   activeTool: null,
+
+  step: 1,
+  setStep: (step) => {
+    // Panels belong to a step; leaving a step closes whatever it had open.
+    const tool = get().activeTool;
+    const keeps = tool !== null && STEP_TOOLS[step].includes(tool);
+    set({
+      step,
+      activeTool: keeps ? tool : null,
+      canvasMode: "element",
+      draftAnnotation: null,
+      draftLasso: null,
+      eraserStrokes: [],
+    });
+  },
+  cardType: "printed",
+  setCardType: (cardType) => set({ cardType }),
   railPinned: false,
   zoom: 0.46,
   credits: 10535,
@@ -152,10 +184,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   future: [],
 
   setFace: (face) => {
-    set({ face, selectedId: null });
+    set({ face, draftAnnotation: null, draftLasso: null, hoverSegment: null });
     get().maybeFit();
   },
-  select: (selectedId) => set({ selectedId }),
   setTool: (activeTool) => set({ activeTool }),
   toggleTool: (tool) =>
     set((s) => ({ activeTool: s.activeTool === tool ? null : tool })),
@@ -232,7 +263,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     face.nodes = face.nodes.filter((n) => n.id !== id);
     set({
       doc,
-      selectedId: state.selectedId === id ? null : state.selectedId,
       past: [...state.past, cloneDoc(state.doc)].slice(-MAX_HISTORY),
       future: [],
     });
@@ -244,25 +274,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     doc.faces[face ?? state.face].nodes.push(node);
     set({
       doc,
-      selectedId: node.id,
       past: [...state.past, cloneDoc(state.doc)].slice(-MAX_HISTORY),
       future: [],
     });
   },
 
-  selectedStyles: ["bold"],
-  toggleStyle: (id) =>
-    set((s) => ({
-      selectedStyles: s.selectedStyles.includes(id)
-        ? s.selectedStyles.filter((x) => x !== id)
-        : [...s.selectedStyles, id],
-    })),
+  selectedStyles: ["ethereal-glitter-portrait"],
+  setStyle: (id) => set({ selectedStyles: [id] }),
 
   envelope: defaultEnvelope,
   updateEnvelope: (patch) =>
     set((s) => ({ envelope: { ...s.envelope, ...patch } })),
 
-  canvasMode: "select",
+  canvasMode: "element",
   // Switching mode clears any half-drawn region, and drops the selection so
   // transformer handles aren't sitting on top of the area you're marking.
   setCanvasMode: (canvasMode) =>
@@ -270,18 +294,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       canvasMode,
       draftAnnotation: null,
       draftLasso: null,
+      draftSegmentLabel: null,
       eraserStrokes: [],
-      selectedId: null,
+      hoverSegment: null,
     }),
 
   draftAnnotation: null,
-  setDraftAnnotation: (draftAnnotation) => set({ draftAnnotation }),
+  setDraftAnnotation: (draftAnnotation) =>
+    set({ draftAnnotation, draftSegmentLabel: null }),
   draftLasso: null,
   setDraftLasso: (draftLasso) => set({ draftLasso }),
+  hoverSegment: null,
+  draftSegmentLabel: null,
+  setHoverSegment: (hoverSegment) => set({ hoverSegment }),
+  selectSegment: (segment) =>
+    set({
+      draftAnnotation: boundsOf(segment.points),
+      draftLasso: segment.points,
+      draftSegmentLabel: segment.label,
+      hoverSegment: null,
+    }),
 
   annotationRequests: [],
   submitAnnotation: (instruction) => {
-    const { draftAnnotation, draftLasso, face } = get();
+    const { draftAnnotation, draftLasso, draftSegmentLabel, face } = get();
     if (!draftAnnotation || !instruction.trim()) return;
 
     const request: AnnotationRequest = {
@@ -289,6 +325,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       face,
       rect: draftAnnotation,
       points: draftLasso ?? undefined,
+      segmentLabel: draftSegmentLabel ?? undefined,
       instruction: instruction.trim(),
       kind: "edit",
       status: "rendering",
@@ -298,7 +335,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       annotationRequests: [...s.annotationRequests, request],
       draftAnnotation: null,
       draftLasso: null,
-      canvasMode: "select",
+      draftSegmentLabel: null,
+      canvasMode: "element",
       agentOpen: true,
     }));
 
@@ -339,7 +377,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set((s) => ({
       annotationRequests: [...s.annotationRequests, request],
       eraserStrokes: [],
-      canvasMode: "select",
+      canvasMode: "element",
       agentOpen: true,
     }));
 
@@ -404,7 +442,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         y: rect.y,
         width: rect.width,
         fontSize: 34,
-        fontFamily: "Inter",
+        fontFamily: "DM Sans",
         fontStyle: "normal",
         fill: "#f7f0dd",
         align: "left",

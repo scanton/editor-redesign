@@ -12,7 +12,7 @@ export const CARD_FONTS: CardFont[] = [
   { id: "Caveat", label: "Caveat", cssVar: "var(--font-caveat)" },
   { id: "Arima", label: "Arima Variable Font", cssVar: "var(--font-arima)" },
   { id: "Fredoka", label: "Fredoka", cssVar: "var(--font-fredoka)" },
-  { id: "Inter", label: "Inter", cssVar: "var(--font-inter)" },
+  { id: "DM Sans", label: "DM Sans", cssVar: "var(--font-dm-sans)" },
 ];
 
 export function fontCssVar(id: string) {

@@ -4,10 +4,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { TOOLS } from "@/components/rail/tools";
+import { CardTypePanel } from "@/components/rail/panels/card-type-panel";
 import { EnvelopePanel } from "@/components/rail/panels/envelope-panel";
 import { LongFormPanel } from "@/components/rail/panels/long-form-panel";
 import { MessagePanel } from "@/components/rail/panels/message-panel";
 import { SignaturePanel } from "@/components/rail/panels/signature-panel";
+import { ReviewPanel } from "@/components/rail/panels/review-panel";
 import { StylesPanel } from "@/components/rail/panels/styles-panel";
 import { TranslationsPanel } from "@/components/rail/panels/translations-panel";
 import { bounceOut, flyoutClose } from "@/lib/motion";
@@ -21,7 +23,9 @@ const PANELS: Record<ToolId, React.ComponentType> = {
   signature: SignaturePanel,
   translations: TranslationsPanel,
   longform: LongFormPanel,
+  cardtype: CardTypePanel,
   envelope: EnvelopePanel,
+  review: ReviewPanel,
 };
 
 /**

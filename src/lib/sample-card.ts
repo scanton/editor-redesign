@@ -1,3 +1,4 @@
+import { ellipsePoly, rectPoly } from "./lasso";
 import type { CardDoc, Envelope } from "./types";
 
 /** A single 5×7 panel, at the resolution the editor works in. */
@@ -39,6 +40,29 @@ export const sampleCard: CardDoc = {
       height: PANEL_HEIGHT,
       background: "#1f3fd8",
       backgroundAccent: "#12239e",
+      // Hand-authored stand-ins for what the segmentation model returns.
+      segments: [
+        {
+          id: "front_bubble_seg",
+          label: "Speech bubble",
+          points: ellipsePoly(730, 180, 200, 105),
+        },
+        {
+          id: "front_headline_seg",
+          label: "Headline type",
+          points: rectPoly(50, 880, 900, 410),
+        },
+        {
+          id: "front_figure_seg",
+          label: "Graduate",
+          points: ellipsePoly(500, 560, 235, 310),
+        },
+        {
+          id: "front_burst_seg",
+          label: "Comic burst background",
+          points: rectPoly(0, 0, PANEL_WIDTH, PANEL_HEIGHT),
+        },
+      ],
       nodes: [
         {
           id: "front_art",
@@ -103,6 +127,28 @@ export const sampleCard: CardDoc = {
       height: SPREAD_HEIGHT,
       background: "#1f3fd8",
       backgroundAccent: "#12239e",
+      segments: [
+        {
+          id: "inside_bubble_seg",
+          label: "Speech bubble",
+          points: ellipsePoly(340, 190, 300, 120),
+        },
+        {
+          id: "inside_message_seg",
+          label: "Message type",
+          points: rectPoly(1100, 190, 800, 560),
+        },
+        {
+          id: "inside_figure_seg",
+          label: "Graduate mid-jump",
+          points: ellipsePoly(520, 760, 300, 380),
+        },
+        {
+          id: "inside_burst_seg",
+          label: "Comic burst background",
+          points: rectPoly(0, 0, SPREAD_WIDTH, SPREAD_HEIGHT),
+        },
+      ],
       nodes: [
         {
           // One image across the whole spread — the art doesn't stop at the fold.

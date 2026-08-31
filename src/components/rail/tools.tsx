@@ -1,4 +1,13 @@
-import { Languages, Mail, PenLine, ScrollText, Shapes, Type } from "lucide-react";
+import {
+  Languages,
+  Mail,
+  PenLine,
+  Receipt,
+  ScrollText,
+  Shapes,
+  Sparkles,
+  Type,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { ToolId } from "@/lib/types";
 
@@ -46,9 +55,27 @@ export const TOOLS: ToolDef[] = [
     blurb: "A newsletter, a poem, a letter — and where it goes.",
   },
   {
+    id: "cardtype",
+    label: "Card type",
+    icon: Sparkles,
+    blurb: "Digital or printed — both stay saved.",
+  },
+  {
     id: "envelope",
     label: "Envelope",
     icon: Mail,
     blurb: "Envelope color, liner, and the addresses on it.",
   },
+  {
+    id: "review",
+    label: "Review",
+    icon: Receipt,
+    blurb: "Everything you have decided, before it ships.",
+  },
 ];
+
+export function toolsForStep(ids: ToolId[]) {
+  return ids
+    .map((id) => TOOLS.find((t) => t.id === id))
+    .filter((t): t is ToolDef => Boolean(t));
+}

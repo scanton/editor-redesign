@@ -4,11 +4,13 @@ import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowUp,
   ChevronDown,
-  Loader2,
-  PanelLeftClose,
-  PanelLeftOpen,
+  ChevronLeft,
+  ChevronRight,
   Eraser,
+  ImagePlus,
   Lasso,
+  Loader2,
+  Scan,
   SquareDashedMousePointer,
   X,
 } from "lucide-react";
@@ -32,9 +34,9 @@ const OPEN_WIDTH = 380;
 const COLLAPSED_WIDTH = 68;
 
 /**
- * The agent is the primary way this card gets edited, so it holds the far-left
- * column at full height rather than floating over the canvas. Annotation lives
- * here too — boxing a region is just a message with a region attached.
+ * Stampy holds the right-hand column at full height. The rail and the assistant
+ * are two doors into the same room: anything you can do in a panel you can ask
+ * for here, and asking here opens the panel that owns it.
  */
 export function AgentDock() {
   const open = useEditorStore((s) => s.agentOpen);
@@ -47,7 +49,7 @@ export function AgentDock() {
     <motion.aside
       animate={{ width: open ? OPEN_WIDTH : COLLAPSED_WIDTH }}
       transition={springHeavy}
-      className="relative z-40 flex h-full shrink-0 flex-col overflow-hidden border-r border-hairline bg-surface"
+      className="relative z-40 flex h-full shrink-0 flex-col overflow-hidden border-l border-hairline bg-surface"
     >
       {open ? (
         <div style={{ width: OPEN_WIDTH }} className="flex h-full flex-col">
@@ -60,13 +62,13 @@ export function AgentDock() {
               New conversation
               <ChevronDown size={14} className="text-ink-faint" />
             </button>
-            <Tooltip label="Collapse assistant" side="bottom">
+            <Tooltip label="Collapse Stampy" side="bottom">
               <IconButton
                 aria-label="Collapse assistant"
                 className="ml-auto h-8 w-8"
                 onClick={() => setOpen(false)}
               >
-                <PanelLeftClose size={17} />
+                <ChevronRight size={17} />
               </IconButton>
             </Tooltip>
           </header>
@@ -144,11 +146,20 @@ export function AgentDock() {
           {/* Composer. */}
           <div className="shrink-0 border-t border-hairline px-3 py-3">
             <div className="flex items-center gap-2">
-              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-hairline px-3.5 py-2.5">
+              <div className="flex min-w-0 flex-1 items-center gap-2 rounded-full border border-hairline px-3 py-2.5">
+                <Tooltip label="Add a photo" side="top">
+                  <button
+                    type="button"
+                    aria-label="Add a photo"
+                    className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-ink-faint hover:bg-surface-sunken hover:text-ink"
+                  >
+                    <ImagePlus size={16} />
+                  </button>
+                </Tooltip>
                 <input
                   value={draft}
                   onChange={(e) => setDraft(e.target.value)}
-                  placeholder="Ask for a change"
+                  placeholder="Ask, search or create your card"
                   className="min-w-0 flex-1 bg-transparent text-[13.5px] text-ink placeholder:text-ink-faint focus:outline-none"
                 />
               </div>
@@ -164,6 +175,9 @@ export function AgentDock() {
                 <ArrowUp size={18} />
               </motion.button>
             </div>
+            <p className="mt-2.5 text-center text-[11.5px] text-ink-faint">
+              Stampy and the rail are two doors into the same room.
+            </p>
           </div>
         </div>
       ) : (
@@ -171,13 +185,13 @@ export function AgentDock() {
           style={{ width: COLLAPSED_WIDTH }}
           className="flex h-full flex-col items-center gap-3 py-3"
         >
-          <Tooltip label="Open assistant" side="right">
+          <Tooltip label="Open Stampy" side="left">
             <IconButton
               aria-label="Open assistant"
               className="h-10 w-10"
               onClick={() => setOpen(true)}
             >
-              <PanelLeftOpen size={18} />
+              <ChevronLeft size={18} />
             </IconButton>
           </Tooltip>
 
@@ -188,9 +202,16 @@ export function AgentDock() {
             whileHover={{ scale: 1.12, rotate: -8 }}
             whileTap={{ scale: 0.92 }}
             transition={springBouncy}
-            className="flex h-11 w-11 items-center justify-center rounded-full bg-surface-sunken"
+            className="flex flex-col items-center gap-3"
           >
             <AgentAvatar size={26} />
+            {/* Named, not just an icon — you should know who you are reopening. */}
+            <span
+              className="text-[12px] font-semibold tracking-[0.08em] text-ink-soft"
+              style={{ writingMode: "vertical-rl" }}
+            >
+              Stampy
+            </span>
           </motion.button>
         </div>
       )}
@@ -217,13 +238,16 @@ function AnnotationMessage({ request }: { request: AnnotationRequest }) {
         <span className="mb-1 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.06em] text-ink-faint">
           {erasing ? (
             <Eraser size={12} />
+          ) : request.segmentLabel ? (
+            <Scan size={12} />
           ) : request.points ? (
             <Lasso size={12} />
           ) : (
             <SquareDashedMousePointer size={12} />
           )}
-          {request.face} · {Math.round(request.rect.width)}×
-          {Math.round(request.rect.height)}
+          {request.face} ·{" "}
+          {request.segmentLabel ??
+            `${Math.round(request.rect.width)}×${Math.round(request.rect.height)}`}
         </span>
         <p className="text-[13.5px] leading-snug text-ink">
           {erasing ? "Remove what I painted over." : request.instruction}

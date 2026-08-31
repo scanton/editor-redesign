@@ -8,15 +8,16 @@ import { LeftRail } from "@/components/rail/left-rail";
 
 export function EditorShell() {
   return (
-    // The top bar spans the whole screen so the logo keeps the top-left corner;
-    // everything else, agent included, sits in the row beneath it.
+    // Top bar spans the whole screen so the logo keeps the top-left corner.
+    // Rail and panels on the left, canvas in the middle, agent on the right —
+    // the assistant sits beside the card rather than in front of the tools.
     <div className="flex h-full flex-col bg-surface">
       <TopBar />
       <div className="relative flex min-h-0 flex-1">
-        <AgentDock />
         <LeftRail />
         <Flyout />
         <CanvasArea />
+        <AgentDock />
       </div>
     </div>
   );

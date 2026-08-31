@@ -7,7 +7,7 @@ import { EraserLayer } from "@/components/canvas/eraser-layer";
 import { RegionLayer } from "@/components/canvas/region-layer";
 import { CanvasTools } from "@/components/canvas/canvas-tools";
 import { EnvelopePreview } from "@/components/canvas/envelope-preview";
-import { PlacementLayer } from "@/components/canvas/placement-layer";
+import { PlacementLayers } from "@/components/canvas/placement-layers";
 import { FaceSwitcher } from "@/components/canvas/face-switcher";
 import { springHeavy } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
@@ -23,10 +23,6 @@ export function CanvasArea() {
   // The Envelope tool takes over the canvas — you're addressing the envelope,
   // not editing the card.
   const showEnvelope = useEditorStore((s) => s.activeTool === "envelope");
-  // Marking up the card takes the pointer, so the two never overlap.
-  const placing = useEditorStore(
-    (s) => s.activeTool === "longform" && s.canvasMode === "select",
-  );
   const setViewport = useEditorStore((s) => s.setViewport);
 
   useEffect(() => {
@@ -68,10 +64,8 @@ export function CanvasArea() {
           </AnimatePresence>
         )}
 
-        {/* Placement box for the long-form block, while that panel is open. */}
-        {!showEnvelope && size.width > 0 && placing && (
-          <PlacementLayer viewport={size} />
-        )}
+        {/* Placement boxes for whichever panel owns a placeable piece. */}
+        {!showEnvelope && size.width > 0 && <PlacementLayers viewport={size} />}
 
         {/* Marking up regions is a card operation — no meaning on the envelope. */}
         {!showEnvelope && size.width > 0 && <RegionLayer viewport={size} />}
