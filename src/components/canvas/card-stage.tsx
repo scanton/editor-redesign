@@ -1,10 +1,20 @@
 "use client";
 
 import type Konva from "konva";
-import { Ellipse, Group, Layer, Line, Rect, Stage, Text } from "react-konva";
+import {
+  Ellipse,
+  Group,
+  Image as KonvaImage,
+  Layer,
+  Line,
+  Rect,
+  Stage,
+  Text,
+} from "react-konva";
+import useImage from "use-image";
 import { useFontFamilies } from "@/components/canvas/use-font-families";
 import { cardTransform } from "@/lib/card-transform";
-import type { EditorNode } from "@/lib/types";
+import type { EditorNode, ImageNode } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
 
 type Props = { width: number; height: number };
@@ -160,17 +170,25 @@ function NodeView({
   }
 
   // The artwork is the flat render — it is the card, not something on it.
+  return <ArtworkNode node={node} />;
+}
+
+/**
+ * The finished artwork. Loading is async, so the card paints its flat colour
+ * until the bitmap arrives rather than flashing an empty rectangle.
+ */
+function ArtworkNode({ node }: { node: ImageNode }) {
+  const [image] = useImage(node.src);
+  if (!image) return null;
   return (
-    <Group {...common}>
-      <Text
-        text={node.label ?? node.name}
-        width={node.width}
-        y={node.height / 2 - 20}
-        align="center"
-        fontSize={34}
-        fontFamily={resolveFont("DM Sans")}
-        fill="rgba(255,255,255,0.85)"
-      />
-    </Group>
+    <KonvaImage
+      image={image}
+      x={node.x}
+      y={node.y}
+      width={node.width}
+      height={node.height}
+      rotation={node.rotation}
+      opacity={node.opacity}
+    />
   );
 }
