@@ -8,6 +8,11 @@ import { cn } from "@/lib/utils";
 
 const ORDER: FaceId[] = ["front", "inside", "back"];
 
+/** A face's thumbnail is its artwork, falling back to its flat colour. */
+function artworkOf(face: { nodes: { kind: string; src?: string }[] }) {
+  return face.nodes.find((n) => n.kind === "image")?.src ?? null;
+}
+
 export function FaceSwitcher() {
   const doc = useEditorStore((s) => s.doc);
   const face = useEditorStore((s) => s.face);
@@ -61,10 +66,14 @@ export function FaceSwitcher() {
                     // Thumbnails carry each face's real proportions, so the
                     // inside reads as the wide spread it is.
                     width: (62 * f.width) / f.height,
-                    backgroundImage: f.backgroundAccent
-                      ? `linear-gradient(180deg, ${f.background}, ${f.backgroundAccent})`
-                      : undefined,
                     backgroundColor: f.background,
+                    backgroundImage: artworkOf(f)
+                      ? `url(${artworkOf(f)})`
+                      : f.backgroundAccent
+                        ? `linear-gradient(180deg, ${f.background}, ${f.backgroundAccent})`
+                        : undefined,
+                    backgroundSize: "cover",
+                    backgroundPosition: "center",
                   }}
                 />
                 {isActive && (

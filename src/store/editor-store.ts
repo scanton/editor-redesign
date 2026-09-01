@@ -29,7 +29,7 @@ import type {
   ToolId,
 } from "@/lib/types";
 import { boundsOf } from "@/lib/lasso";
-import { stepTools } from "@/lib/steps";
+import { STEP_DEFAULT_TOOL, stepTools } from "@/lib/steps";
 import type {
   DigitalDelivery,
   PrintedDelivery,
@@ -224,12 +224,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   step: 1,
   setStep: (step) => {
-    // Panels belong to a step; leaving a step closes whatever it had open.
+    // Panels belong to a step. Keep whatever is open if it lives in the step
+    // being opened; otherwise lead with that step's first decision.
     const tool = get().activeTool;
     const keeps = tool !== null && stepTools(step, get().cardType).includes(tool);
     set({
       step,
-      activeTool: keeps ? tool : null,
+      activeTool: keeps ? tool : STEP_DEFAULT_TOOL[step],
       agentOpen: step !== 3,
       canvasMode: "element",
       draftAnnotation: null,

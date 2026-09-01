@@ -1,8 +1,13 @@
-import { PANEL_HEIGHT, PANEL_WIDTH } from "./sample-card";
+import {
+  PANEL_WIDTH,
+  SPREAD_HEIGHT,
+  SPREAD_WIDTH,
+} from "./sample-card";
 import type { AnnotationRect } from "./types";
 
 /**
- * Print geometry. A 5×7 panel is authored at 1000×1400, so 200px = 1 inch.
+ * Print geometry, derived from the artwork: a 5×7 panel is 1056×1488, so
+ * 211px = 1 inch.
  *
  * Commercial trim tolerance is about 1/8", and anything within about 1/4" of
  * the edge reads as crowded once the card is cut — so text stays 0.3" clear.
@@ -10,20 +15,23 @@ import type { AnnotationRect } from "./types";
  * breathe around them.
  */
 export const PX_PER_INCH = PANEL_WIDTH / 5;
-export const CUT_SAFE_MARGIN = Math.round(0.3 * PX_PER_INCH); // 60px
-const ART_BREATHING_ROOM = Math.round(0.3 * PX_PER_INCH); // 60px
+export const CUT_SAFE_MARGIN = Math.round(0.3 * PX_PER_INCH);
+const ART_BREATHING_ROOM = Math.round(0.3 * PX_PER_INCH);
 
 /**
- * Default long-form placement: most of the left-hand panel of the inside
- * spread, held off the trim edge and off the fold.
+ * Default long-form placement: the right-hand panel of the inside spread,
+ * held off the trim edge and off the fold.
  */
 export function defaultLongFormRect(): AnnotationRect {
-  const inset = CUT_SAFE_MARGIN + ART_BREATHING_ROOM; // 120px ≈ 0.6"
+  const inset = CUT_SAFE_MARGIN + ART_BREATHING_ROOM;
+  // The right-hand panel of the inside spread — the side the artwork leaves
+  // clear. The fold is at half the spread's width.
+  const fold = SPREAD_WIDTH / 2;
   return {
-    x: inset,
-    y: inset + 60,
-    width: PANEL_WIDTH - inset * 2,
-    height: PANEL_HEIGHT - inset * 2 - 120,
+    x: fold + inset / 2,
+    y: inset,
+    width: fold - inset,
+    height: SPREAD_HEIGHT - inset * 2,
   };
 }
 

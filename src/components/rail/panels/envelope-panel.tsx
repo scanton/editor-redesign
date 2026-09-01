@@ -79,7 +79,7 @@ export function EnvelopePanel() {
               </Section>
 
               <Section
-                title="Envelope looks"
+                title="Envelope design"
                 action={
                   <span className="flex items-center gap-1.5 text-[12px] font-medium text-brand-red">
                     <Check size={13} />

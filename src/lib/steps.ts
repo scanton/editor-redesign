@@ -31,6 +31,17 @@ const DIGITAL_ONLY: ToolId[] = ["background", "reveal", "cover"];
 
 const FINISH_TOOLS: ToolId[] = ["delivery", "recipients", "printopts", "review"];
 
+/**
+ * The panel a step opens on. Landing on a step with nothing open reads as a
+ * dead end, so each one leads with its first decision — except Create, where
+ * the card itself is the thing to look at.
+ */
+export const STEP_DEFAULT_TOOL: Record<Step, ToolId | null> = {
+  1: null,
+  2: "cardtype",
+  3: "delivery",
+};
+
 export function stepOf(tool: ToolId): Step {
   if (FINISH_TOOLS.includes(tool)) return 3;
   if (tool === "cardtype" || tool === "envelope" || DIGITAL_ONLY.includes(tool))
