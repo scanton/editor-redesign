@@ -19,16 +19,20 @@ export const CUT_SAFE_MARGIN = Math.round(0.3 * PX_PER_INCH);
 const ART_BREATHING_ROOM = Math.round(0.3 * PX_PER_INCH);
 
 /**
- * Default long-form placement: the right-hand panel of the inside spread,
+ * Default long-form placement: the left-hand panel of the inside spread,
  * held off the trim edge and off the fold.
+ *
+ * Long-form is framed and rendered into the artwork, so it does not have to
+ * wait for a gap in the design — it makes its own. The left panel is where it
+ * goes, which also keeps it clear of the handwritten message, closing and
+ * signature the customer fills in on the right.
  */
 export function defaultLongFormRect(): AnnotationRect {
   const inset = CUT_SAFE_MARGIN + ART_BREATHING_ROOM;
-  // The right-hand panel of the inside spread — the side the artwork leaves
-  // clear. The fold is at half the spread's width.
+  // The fold runs down the middle of the spread.
   const fold = SPREAD_WIDTH / 2;
   return {
-    x: fold + inset / 2,
+    x: inset / 2,
     y: inset,
     width: fold - inset,
     height: SPREAD_HEIGHT - inset * 2,
