@@ -23,6 +23,7 @@ export function RecipientsPanel() {
   const update = useEditorStore((s) => s.updateRecipient);
   const remove = useEditorStore((s) => s.removeRecipient);
   const cardType = useEditorStore((s) => s.cardType);
+  const product = useEditorStore((s) => s.product);
 
   return (
     <PanelBody>
@@ -119,7 +120,7 @@ export function RecipientsPanel() {
         <Section>
           <p className="rounded-[12px] bg-surface-sunken/70 p-3 text-[12px] leading-snug text-ink-faint">
             {isDigital
-              ? `Each recipient gets their own link, priced at ${priceOf(cardType).price}.`
+              ? `Each recipient gets their own link, priced at ${priceOf(cardType, product).price}.`
               : "Every address is printed and posted separately."}
           </p>
         </Section>

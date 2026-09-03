@@ -9,6 +9,8 @@ import { CanvasTools } from "@/components/canvas/canvas-tools";
 import { EnvelopePreview } from "@/components/canvas/envelope-preview";
 import { SceneLayer } from "@/components/canvas/scene-layer";
 import { PlacementLayers } from "@/components/canvas/placement-layers";
+import { QrLayer } from "@/components/canvas/qr-layer";
+import { RenderPill } from "@/components/canvas/render-pill";
 import { FaceSwitcher } from "@/components/canvas/face-switcher";
 import { springHeavy } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
@@ -31,6 +33,18 @@ export function CanvasArea() {
   const setViewport = useEditorStore((s) => s.setViewport);
   // Finish is checkout — nothing on the card is editable from there.
   const editing = useEditorStore((s) => s.step !== 3);
+  // The code is grabbable while the panel that owns it is open, and only on
+  // the panel it is printed on.
+  const showQrHandles = useEditorStore(
+    (s) =>
+      s.product === "invitation" &&
+      s.activeTool === "event" &&
+      s.invitation.qrOn &&
+      s.invitation.rsvpOn &&
+      s.surface === "card" &&
+      s.face === "back" &&
+      s.canvasMode === "element",
+  );
 
   useEffect(() => {
     const host = hostRef.current;
@@ -75,6 +89,10 @@ export function CanvasArea() {
 
         {/* Placement boxes for whichever panel owns a placeable piece. */}
         {!showEnvelope && size.width > 0 && <PlacementLayers viewport={size} />}
+
+        {showQrHandles && size.width > 0 && <QrLayer viewport={size} />}
+
+        <RenderPill />
 
         {/* Marking up regions is a card operation — no meaning on the envelope. */}
         {!showEnvelope && size.width > 0 && <RegionLayer viewport={size} />}

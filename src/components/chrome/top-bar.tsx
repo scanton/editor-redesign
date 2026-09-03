@@ -14,6 +14,7 @@ import {
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { Logo } from "@/components/chrome/logo";
+import { ProductSwitch } from "@/components/chrome/product-switch";
 import { Stepper } from "@/components/chrome/stepper";
 import { springBouncy, springTight } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
@@ -23,14 +24,15 @@ export function TopBar() {
 
   return (
     <header className="relative z-30 flex h-[var(--topbar-height)] shrink-0 items-center justify-between gap-3 border-b border-hairline bg-surface px-4">
-      <div className="flex min-w-0 items-center gap-6">
+      <div className="flex min-w-0 items-center gap-4">
         <Logo />
+        <ProductSwitch />
         <Stepper />
       </div>
 
       {/* Finish is checkout, not editing: the view controls step aside and the
           price takes their place. */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-1.5">
         {step === 3 ? <FinishBar /> : <EditTools />}
       </div>
     </header>
@@ -57,7 +59,9 @@ function CreditsPill() {
       <span className="text-sm font-semibold text-ink">
         {credits.toLocaleString()}
       </span>
-      <span className="text-sm text-ink-soft">Heart Credits</span>
+      <span className="hidden text-sm text-ink-soft 2xl:inline">
+        Heart Credits
+      </span>
     </motion.div>
   );
 }
@@ -65,13 +69,15 @@ function CreditsPill() {
 function FinishBar() {
   const total = useEditorStore((s) => s.orderTotal());
   const cardType = useEditorStore((s) => s.cardType);
+  const product = useEditorStore((s) => s.product);
   const recipients = useEditorStore((s) => s.fulfilment.recipients.length);
   const quantity = useEditorStore((s) => s.fulfilment.quantity);
 
+  const thing = product === "invitation" ? "invitation" : "card";
   const units =
     cardType === "digital"
       ? plural(recipients, "digital send")
-      : plural(quantity, "printed card");
+      : plural(quantity, `printed ${thing}`);
 
   return (
     <>
@@ -175,7 +181,7 @@ function EditTools() {
         className="flex shrink-0 items-center gap-2 whitespace-nowrap rounded-full px-3 py-2 text-sm font-semibold text-ink hover:bg-surface-sunken"
       >
         <Eye size={18} />
-        Preview
+        <span className="hidden 2xl:inline">Preview</span>
       </motion.button>
 
       <motion.button

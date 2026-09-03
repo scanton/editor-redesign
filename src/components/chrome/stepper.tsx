@@ -25,7 +25,7 @@ export function Stepper() {
         const done = s.id < step;
         return (
           <div key={s.id} className="flex items-center gap-1">
-            {i > 0 && <span className="h-px w-5 bg-hairline-strong" />}
+            {i > 0 && <span className="h-px w-4 bg-hairline-strong" />}
             <Tooltip label={s.note} side="bottom">
               <motion.button
                 type="button"
@@ -35,7 +35,7 @@ export function Stepper() {
                 whileTap={{ scale: 0.96 }}
                 transition={springTight}
                 className={cn(
-                  "flex items-center gap-2 rounded-full py-1.5 pl-1.5 pr-3 transition-colors",
+                  "flex items-center gap-1.5 rounded-full py-1.5 pl-1.5 pr-2.5 transition-colors",
                   current ? "text-ink" : "text-ink-faint hover:text-ink-soft",
                 )}
               >
@@ -51,7 +51,17 @@ export function Stepper() {
                 >
                   {done ? <Check size={12} strokeWidth={3} /> : s.id}
                 </span>
-                <span className="text-[13.5px] font-semibold">{s.label}</span>
+                {/* Two products, three steps and the view controls all want
+                    the same bar. Below a wide viewport only the step you are
+                    standing in keeps its name; the numbers carry the rest. */}
+                <span
+                  className={cn(
+                    "text-[13.5px] font-semibold",
+                    current ? "inline" : "hidden 2xl:inline",
+                  )}
+                >
+                  {s.label}
+                </span>
               </motion.button>
             </Tooltip>
           </div>

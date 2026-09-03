@@ -2,6 +2,16 @@
 
 import { create } from "zustand";
 import { defaultEnvelope, sampleCard } from "@/lib/sample-card";
+import {
+  DEFAULT_QR,
+  clampQr,
+  invitationDoc,
+  type EventDetail,
+  type QrShape,
+  type RsvpMethod,
+  type ScheduleRow,
+  type SchemaSlot,
+} from "@/lib/invitation";
 import { SWITCHER_INSET, TOOLBAR_INSET } from "@/lib/card-transform";
 import {
   defaultLongFormRect,
@@ -15,6 +25,8 @@ import {
   type Scene,
 } from "@/lib/digital-card";
 import type {
+  Orientation,
+  Product,
   AnnotationRect,
   AnnotationRequest,
   CanvasMode,
@@ -35,7 +47,7 @@ import type {
   PrintedDelivery,
   Recipient,
 } from "@/lib/fulfilment";
-import { CARD_TYPES } from "@/lib/pricing";
+import { ENVELOPE_ADD_ON, priceOf, unitPrice } from "@/lib/pricing";
 import { clamp, uid } from "@/lib/utils";
 
 const MAX_HISTORY = 50;
@@ -54,6 +66,58 @@ type EditorState = {
   doc: CardDoc;
   face: FaceId;
   activeTool: ToolId | null;
+
+  /**
+   * Greeting cards or invitations. Each product keeps its own document and
+   * history, so switching lines never costs you the work on the other.
+   */
+  product: Product;
+  setProduct: (product: Product) => void;
+
+  /**
+   * Invitations carry structured event data rather than a written message.
+   * The image model bakes it into the back panel, which is why changing a
+   * printed field leaves the render behind the data rather than editing it.
+   */
+  invitation: {
+    orientation: Orientation;
+    eventName: string;
+    tagline: string;
+    hosts: string;
+    date: string;
+    time: string;
+    locationName: string;
+    address: string;
+    /** Optional schema fields and custom rows, each with its eye toggle. */
+    details: EventDetail[];
+    schedule: ScheduleRow[];
+    rsvpOn: boolean;
+    rsvpMethod: RsvpMethod;
+    rsvpValue: string;
+    rsvpDeadline: string;
+    rsvpLine: string;
+    qrOn: boolean;
+    qrShape: QrShape;
+    /** Fractions of the panel, so the code survives an orientation change. */
+    qr: { x: number; y: number; width: number };
+    /** The artwork is behind the data and needs a new render. */
+    stale: boolean;
+    rendering: boolean;
+  };
+  /**
+   * Patching event data. Anything that reaches the artwork leaves the render
+   * stale; the QR is composited by the editor afterwards, so moving it never
+   * does.
+   */
+  setInvitation: (patch: Partial<EditorState["invitation"]>) => void;
+  setOrientation: (orientation: Orientation) => void;
+  addDetail: (label: string, slot: SchemaSlot | null, onInvitation: boolean) => void;
+  updateDetail: (id: string, patch: Partial<EventDetail>) => void;
+  removeDetail: (id: string) => void;
+  setSchedule: (rows: ScheduleRow[]) => void;
+  moveQr: (pos: { x: number; y: number }, width?: number) => void;
+  /** Hand the details back to the model and wait for new artwork. */
+  renderInvitation: () => void;
 
   /** Create → Personalize → Finish. The rail regroups per step. */
   step: Step;
@@ -105,6 +169,12 @@ type EditorState = {
   addRecipient: () => void;
   updateRecipient: (id: string, patch: Partial<Recipient>) => void;
   removeRecipient: (id: string) => void;
+  /**
+   * Envelopes come with a greeting card. On printed invitations they are an
+   * add-on, priced per copy.
+   */
+  envelopeAddOn: boolean;
+  setEnvelopeAddOn: (value: boolean) => void;
   /** Both renditions can end up in the same order. */
   alsoInCart: boolean;
   setAlsoInCart: (value: boolean) => void;
@@ -217,17 +287,238 @@ function cloneDoc(doc: CardDoc): CardDoc {
   return structuredClone(doc);
 }
 
+/**
+ * Kept outside the store: parking the other product's document is bookkeeping,
+ * not state anything renders from.
+ */
+const stash: Record<Product, Stash | null> = { card: null, invitation: null };
+
+/** A product's work, parked while the other line is open. */
+type Stash = {
+  doc: CardDoc;
+  face: FaceId;
+  past: CardDoc[];
+  future: CardDoc[];
+};
+
+/**
+ * Fields that reach the artwork no matter what. The rest earn it: a detail
+ * through its eye toggle, the RSVP lines by RSVPs being collected at all.
+ */
+const PRINTED_FIELDS: (keyof EditorState["invitation"])[] = [
+  "eventName",
+  "tagline",
+  "hosts",
+  "date",
+  "time",
+  "locationName",
+  "address",
+];
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   doc: cloneDoc(sampleCard),
   face: "front",
   activeTool: null,
+
+  product: "card",
+  setProduct: (product) => {
+    const state = get();
+    if (product === state.product) return;
+
+    const parked: Stash = {
+      doc: state.doc,
+      face: state.face,
+      past: state.past,
+      future: state.future,
+    };
+    const resumed =
+      stash[product] ??
+      ({
+        doc:
+          product === "invitation"
+            ? invitationDoc(state.invitation.orientation)
+            : cloneDoc(sampleCard),
+        face: "front",
+        past: [],
+        future: [],
+      } satisfies Stash);
+    stash[state.product] = parked;
+    stash[product] = null;
+
+    // The rail differs per product, so a panel the other line does not have
+    // has to give way to whatever this step opens on.
+    const tool = state.activeTool;
+    const keeps =
+      tool !== null && stepTools(state.step, state.cardType, product).includes(tool);
+
+    set({
+      product,
+      doc: resumed.doc,
+      face: resumed.face,
+      past: resumed.past,
+      future: resumed.future,
+      activeTool: keeps ? tool : STEP_DEFAULT_TOOL[state.step],
+      surface: "card",
+      canvasMode: "element",
+      draftAnnotation: null,
+      draftLasso: null,
+      eraserStrokes: [],
+      zoomTouched: false,
+    });
+    get().maybeFit();
+  },
+
+  invitation: {
+    orientation: "portrait",
+    eventName: "The Funeral for My Youth",
+    tagline: "Join us for the After Party",
+    hosts: "Anuj Patel",
+    date: "Saturday, November 13th, 2027",
+    time: "9:00 PM",
+    locationName: "The Underground Bar",
+    address: "Brooklyn, NY",
+    details: [
+      {
+        id: "d_dress",
+        label: "Dress code",
+        value: "All Black",
+        onInvitation: true,
+        slot: "dresscode",
+      },
+    ],
+    schedule: [],
+    rsvpOn: true,
+    rsvpMethod: "url",
+    rsvpValue: "hstmp.co/funeral-youth",
+    rsvpDeadline: "November 1st, 2027",
+    rsvpLine: "RSVP before I get old",
+    qrOn: true,
+    qrShape: "rounded",
+    qr: { ...DEFAULT_QR },
+    stale: false,
+    rendering: false,
+  },
+
+  setInvitation: (patch) =>
+    set((s) => {
+      const touchesArt =
+        PRINTED_FIELDS.some((k) => k in patch) ||
+        // The RSVP lines are printed only while responses are being collected.
+        (("rsvpLine" in patch || "rsvpDeadline" in patch || "rsvpOn" in patch) &&
+          (patch.rsvpOn ?? s.invitation.rsvpOn));
+      return {
+        invitation: {
+          ...s.invitation,
+          ...patch,
+          stale: s.invitation.stale || touchesArt,
+        },
+      };
+    }),
+
+  setOrientation: (orientation) =>
+    set((s) => {
+      if (orientation === s.invitation.orientation) return {};
+      return {
+        // Orientation is a property of the product, not a view of it: the trim
+        // changes, so the document is rebuilt around the new one.
+        doc:
+          s.product === "invitation"
+            ? cloneDoc(invitationDoc(orientation))
+            : s.doc,
+        invitation: { ...s.invitation, orientation, stale: true },
+        zoomTouched: false,
+      };
+    }),
+
+  addDetail: (label, slot, onInvitation) =>
+    set((s) => ({
+      invitation: {
+        ...s.invitation,
+        details: [
+          ...s.invitation.details,
+          { id: uid("detail"), label, value: "", onInvitation, slot },
+        ],
+        // An empty row changes nothing on the artwork until it says something.
+        stale: s.invitation.stale,
+      },
+    })),
+
+  updateDetail: (id, patch) =>
+    set((s) => {
+      const details = s.invitation.details.map((d) =>
+        d.id === id ? { ...d, ...patch } : d,
+      );
+      const before = s.invitation.details.find((d) => d.id === id);
+      // Editing a hidden row is bookkeeping; showing or hiding one, or
+      // editing a shown one, changes what gets printed.
+      const touchesArt =
+        !!before &&
+        (before.onInvitation ||
+          ("onInvitation" in patch && patch.onInvitation !== before.onInvitation));
+      return {
+        invitation: {
+          ...s.invitation,
+          details,
+          stale: s.invitation.stale || touchesArt,
+        },
+      };
+    }),
+
+  removeDetail: (id) =>
+    set((s) => {
+      const gone = s.invitation.details.find((d) => d.id === id);
+      return {
+        invitation: {
+          ...s.invitation,
+          details: s.invitation.details.filter((d) => d.id !== id),
+          stale: s.invitation.stale || (!!gone?.onInvitation && !!gone.value),
+        },
+      };
+    }),
+
+  setSchedule: (schedule) =>
+    set((s) => {
+      const shown = s.invitation.details.some(
+        (d) => d.slot === "schedule" && d.onInvitation,
+      );
+      return {
+        invitation: {
+          ...s.invitation,
+          schedule,
+          stale: s.invitation.stale || shown,
+        },
+      };
+    }),
+
+  // The code is composited onto the finished artwork by the editor, so moving
+  // or resizing it never asks the model for anything.
+  moveQr: (pos, width) =>
+    set((s) => {
+      const w = width ?? s.invitation.qr.width;
+      return { invitation: { ...s.invitation, qr: { ...clampQr(pos, w), width: w } } };
+    }),
+
+  renderInvitation: () => {
+    if (get().invitation.rendering) return;
+    set((s) => ({ invitation: { ...s.invitation, rendering: true } }));
+    // Stub: the real agent re-renders the back panel from invitationDetails.
+    window.setTimeout(() => {
+      set((s) => ({
+        invitation: { ...s.invitation, rendering: false, stale: false },
+      }));
+      // The change is on the back, so that is what there is to look at.
+      if (get().product === "invitation") get().setFace("back");
+    }, 1800);
+  },
 
   step: 1,
   setStep: (step) => {
     // Panels belong to a step. Keep whatever is open if it lives in the step
     // being opened; otherwise lead with that step's first decision.
     const tool = get().activeTool;
-    const keeps = tool !== null && stepTools(step, get().cardType).includes(tool);
+    const keeps =
+      tool !== null &&
+      stepTools(step, get().cardType, get().product).includes(tool);
     set({
       step,
       activeTool: keeps ? tool : STEP_DEFAULT_TOOL[step],
@@ -244,7 +535,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // has to close rather than linger.
     const { step, activeTool } = get();
     const keeps =
-      activeTool !== null && stepTools(step, cardType).includes(activeTool);
+      activeTool !== null &&
+      stepTools(step, cardType, get().product).includes(activeTool);
     set({
       cardType,
       activeTool: keeps ? activeTool : "cardtype",
@@ -333,15 +625,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })),
   alsoInCart: false,
   setAlsoInCart: (alsoInCart) => set({ alsoInCart }),
+  envelopeAddOn: true,
+  setEnvelopeAddOn: (envelopeAddOn) => set({ envelopeAddOn }),
 
   // Digital is priced per recipient because each one gets their own link;
-  // print is priced per copy.
+  // print is priced per copy, and invitations earn a quantity break because
+  // they are bought by the guest list rather than one at a time.
   orderTotal: () => {
-    const { cardType, fulfilment, alsoInCart } = get();
-    const unit = (id: "digital" | "printed") =>
-      CARD_TYPES.find((t) => t.id === id)!.unit;
-    const digitalSum = unit("digital") * fulfilment.recipients.length;
-    const printedSum = unit("printed") * fulfilment.quantity;
+    const { cardType, fulfilment, alsoInCart, product, envelopeAddOn } = get();
+    const { quantity, recipients } = fulfilment;
+    const digitalSum = priceOf("digital", product).unit * recipients.length;
+    const printedSum =
+      unitPrice(product, "printed", quantity) * quantity +
+      (product === "invitation" && envelopeAddOn
+        ? ENVELOPE_ADD_ON * quantity
+        : 0);
     const primary = cardType === "digital" ? digitalSum : printedSum;
     const extra = alsoInCart
       ? cardType === "digital"

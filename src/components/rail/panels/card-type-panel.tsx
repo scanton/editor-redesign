@@ -2,9 +2,9 @@
 
 import { motion } from "motion/react";
 import { Check, Printer, Sparkles } from "lucide-react";
-import { PanelBody, Section } from "@/components/rail/panels/parts";
+import { PanelBody, Section, Segmented } from "@/components/rail/panels/parts";
 import { springBouncy, staggerParent } from "@/lib/motion";
-import { CARD_TYPES } from "@/lib/pricing";
+import { renditions } from "@/lib/pricing";
 import { useEditorStore } from "@/store/editor-store";
 import { cn } from "@/lib/utils";
 
@@ -18,13 +18,17 @@ const ICONS = { digital: Sparkles, printed: Printer };
 export function CardTypePanel() {
   const cardType = useEditorStore((s) => s.cardType);
   const setCardType = useEditorStore((s) => s.setCardType);
+  const product = useEditorStore((s) => s.product);
+  const orientation = useEditorStore((s) => s.invitation.orientation);
+  const setOrientation = useEditorStore((s) => s.setOrientation);
+  const thing = product === "invitation" ? "invitation" : "card";
 
   return (
     <PanelBody>
       <motion.div variants={staggerParent} initial="hidden" animate="visible">
         <Section title="Rendition">
           <div className="flex flex-col gap-2.5">
-            {CARD_TYPES.map((type) => {
+            {renditions(product).map((type) => {
               const on = cardType === type.id;
               const Icon = ICONS[type.id];
               return (
@@ -76,10 +80,29 @@ export function CardTypePanel() {
           </div>
         </Section>
 
+        {product === "invitation" && (
+          <Section title="Orientation">
+            <Segmented
+              id="orientation"
+              value={orientation}
+              onChange={(v) => setOrientation(v as "portrait" | "landscape")}
+              options={[
+                { value: "portrait", label: "Portrait 5×7" },
+                { value: "landscape", label: "Landscape 7×5" },
+              ]}
+            />
+            <p className="mt-2.5 text-[12px] leading-snug text-ink-faint">
+              A7 either way. Orientation reaches the whole pipeline — the trim,
+              the layout the model renders to, and the print file — so the
+              artwork is re-rendered rather than rotated.
+            </p>
+          </Section>
+        )}
+
         <Section>
           <p className="rounded-[12px] bg-surface-sunken/70 p-3 text-[12px] leading-snug text-ink-faint">
             Both renditions stay saved at all times. Switching never loses work on
-            the other one, and both can go in the same order.
+            the other one, and both {thing}s can go in the same order.
           </p>
         </Section>
       </motion.div>

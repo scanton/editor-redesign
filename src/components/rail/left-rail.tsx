@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { toolsForStep } from "@/components/rail/tools";
+import { toolLabel, toolsForStep } from "@/components/rail/tools";
 import { STEPS, stepTools } from "@/lib/steps";
 import { springBouncy, springTight } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
@@ -12,15 +12,17 @@ export function LeftRail() {
   const toggleTool = useEditorStore((s) => s.toggleTool);
   const step = useEditorStore((s) => s.step);
   const cardType = useEditorStore((s) => s.cardType);
+  const product = useEditorStore((s) => s.product);
 
-  const tools = toolsForStep(stepTools(step, cardType));
+  const tools = toolsForStep(stepTools(step, cardType, product));
   // The group is named for what you are doing, and Personalize says which
   // rendition you are dressing.
+  const thing = product === "invitation" ? "invitation" : "card";
   const groupLabel =
     step === 2
       ? cardType === "digital"
-        ? "Digital card"
-        : "Printed card"
+        ? `Digital ${thing}`
+        : `Printed ${thing}`
       : STEPS.find((s) => s.id === step)!.label;
 
   return (
@@ -39,7 +41,7 @@ export function LeftRail() {
           <motion.button
             key={tool.id}
             type="button"
-            aria-label={tool.label}
+            aria-label={toolLabel(tool, product)}
             aria-pressed={isActive}
             onClick={() => toggleTool(tool.id)}
             initial={{ opacity: 0, x: -12 }}
@@ -67,7 +69,7 @@ export function LeftRail() {
             >
               <Icon size={22} strokeWidth={1.8} />
             </motion.span>
-            <span className="relative leading-none">{tool.label}</span>
+            <span className="relative leading-none">{toolLabel(tool, product)}</span>
           </motion.button>
         );
       })}

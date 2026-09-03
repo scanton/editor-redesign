@@ -1,4 +1,4 @@
-import type { CardType, Step, ToolId } from "./types";
+import type { CardType, Product, Step, ToolId } from "./types";
 
 /**
  * The job has three parts: make the card, dress how it is sent, then send it.
@@ -12,12 +12,24 @@ export const STEPS: { id: Step; label: string; note: string }[] = [
 ];
 
 /**
- * Panels available in each step. Card type forks the Personalize rail: a print
- * only needs the mailer, while a digital card has a scene, a reveal and a cover.
+ * Panels available in each step, forked twice over.
+ *
+ * The product decides what Create holds: a greeting card is written and signed,
+ * while an invitation carries event data instead — there is no inside to sign,
+ * and its words come from the details rather than a message.
+ *
+ * The rendition then forks Personalize: a print only needs the mailer, while a
+ * digital one has a scene, a reveal and a cover.
  */
-export function stepTools(step: Step, cardType: CardType): ToolId[] {
+export function stepTools(
+  step: Step,
+  cardType: CardType,
+  product: Product = "card",
+): ToolId[] {
   if (step === 1)
-    return ["styles", "message", "longform", "signature", "translations"];
+    return product === "invitation"
+      ? ["styles", "event", "translations"]
+      : ["styles", "message", "longform", "signature", "translations"];
   if (step === 2)
     return cardType === "digital"
       ? ["cardtype", "background", "envelope", "reveal", "cover"]

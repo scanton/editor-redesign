@@ -42,6 +42,11 @@ export function ReviewPanel() {
   const total = useEditorStore((s) => s.orderTotal());
   const warnings = useWarnings();
   const [upsellOff, setUpsellOff] = useState(false);
+  const product = useEditorStore((s) => s.product);
+  const invitation = useEditorStore((s) => s.invitation);
+  const printedCount = invitation.details.filter(
+    (d) => d.onInvitation && d.value.trim(),
+  ).length;
 
   const message = useNode<TextNode>("inside_message");
   const signature = useNode<DrawNode>("inside_signature");
@@ -49,34 +54,85 @@ export function ReviewPanel() {
     (signature?.strokes.length ?? 0) > 0 || !!signature?.typed?.text;
 
   const isDigital = cardType === "digital";
-  const type = priceOf(cardType);
-  const other = priceOf(isDigital ? "printed" : "digital");
+  const type = priceOf(cardType, product);
+  const other = priceOf(isDigital ? "printed" : "digital", product);
   const option = findLongForm(longForm.kind);
   const upsell = upsellFor(cardType);
 
-  const rows: Row[] = [
-    {
-      step: "Create",
-      key: "Art style",
-      value: findStyle(styles[0] ?? null)?.label ?? "Not chosen",
-    },
-    { step: "Create", key: "Message", value: message?.text ? "Written" : "Empty" },
-    {
-      step: "Create",
-      key: "Long-form",
-      value:
-        longForm.status === "placed"
-          ? `${option?.label ?? "Uploaded text"} · placed inside`
-          : "None",
-    },
-    { step: "Create", key: "Signature", value: signed ? "Signed" : "Not signed" },
-    {
-      step: "Create",
-      key: "Language",
-      value: findLanguage(language)?.name ?? "English",
-    },
-    { step: "Personalize", key: "Card type", value: type.label },
-  ];
+  const isInvitation = product === "invitation";
+
+  // An invitation is described rather than written, so what there is to check
+  // before it goes out is the event data and whether the artwork matches it.
+  const rows: Row[] = isInvitation
+    ? [
+        {
+          step: "Create",
+          key: "Art style",
+          value: findStyle(styles[0] ?? null)?.label ?? "Not chosen",
+        },
+        { step: "Create", key: "Event", value: invitation.eventName || "Unnamed" },
+        {
+          step: "Create",
+          key: "When",
+          value: [invitation.date, invitation.time].filter(Boolean).join(" · ") || "Not set",
+        },
+        {
+          step: "Create",
+          key: "Where",
+          value:
+            [invitation.locationName, invitation.address].filter(Boolean).join(" · ") ||
+            "Not set",
+        },
+        {
+          step: "Create",
+          key: "On the artwork",
+          value: `${printedCount} of ${invitation.details.length} extra detail${
+            invitation.details.length === 1 ? "" : "s"
+          }`,
+        },
+        {
+          step: "Create",
+          key: "RSVP",
+          value: invitation.rsvpOn
+            ? `${invitation.rsvpValue || "No destination"}${invitation.qrOn ? " · QR on the back" : " · no QR"}`
+            : "Not collecting",
+        },
+        {
+          step: "Create",
+          key: "Artwork",
+          value: invitation.stale ? "Behind the details" : "Up to date",
+        },
+        {
+          step: "Personalize",
+          key: "Format",
+          value: `${type.label} · ${
+            invitation.orientation === "portrait" ? "5×7 portrait" : "7×5 landscape"
+          }`,
+        },
+      ]
+    : [
+        {
+          step: "Create",
+          key: "Art style",
+          value: findStyle(styles[0] ?? null)?.label ?? "Not chosen",
+        },
+        { step: "Create", key: "Message", value: message?.text ? "Written" : "Empty" },
+        {
+          step: "Create",
+          key: "Long-form",
+          value:
+            longForm.status === "placed"
+              ? `${option?.label ?? "Uploaded text"} · placed inside`
+              : "None",
+        },
+        { step: "Create", key: "Signature", value: signed ? "Signed" : "Not signed" },
+        {
+          step: "Create",
+          key: "Language",
+          value: findLanguage(language)?.name ?? "English",
+        },
+        { step: "Personalize", key: "Card type", value: type.label },
+      ];
 
   if (isDigital) {
     const preset = REVEAL_PRESETS.find((p) => p.id === digital.reveal.preset);

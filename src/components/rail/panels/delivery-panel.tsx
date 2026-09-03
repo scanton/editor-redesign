@@ -6,7 +6,7 @@ import type { LucideIcon } from "lucide-react";
 import { PanelBody, Section } from "@/components/rail/panels/parts";
 import { springTight, staggerParent } from "@/lib/motion";
 import {
-  DIGITAL_DELIVERY,
+  digitalDeliveryFor,
   PRINTED_DELIVERY,
   type DigitalDelivery,
   type PrintedDelivery,
@@ -25,10 +25,11 @@ const ICONS: Record<string, LucideIcon> = {
 /** How the card reaches them. Different question for each rendition. */
 export function DeliveryPanel() {
   const isDigital = useEditorStore((s) => s.cardType === "digital");
+  const product = useEditorStore((s) => s.product);
   const fulfilment = useEditorStore((s) => s.fulfilment);
   const setFulfilment = useEditorStore((s) => s.setFulfilment);
 
-  const options = isDigital ? DIGITAL_DELIVERY : PRINTED_DELIVERY;
+  const options = isDigital ? digitalDeliveryFor(product) : PRINTED_DELIVERY;
   const current = isDigital
     ? fulfilment.digitalDelivery
     : fulfilment.printedDelivery;

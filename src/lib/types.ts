@@ -2,6 +2,7 @@ export type FaceId = "front" | "inside" | "back";
 
 export type ToolId =
   | "styles"
+  | "event"
   | "message"
   | "signature"
   | "translations"
@@ -18,6 +19,16 @@ export type ToolId =
 
 /** The canvas shows one of these at a time. */
 export type Surface = "card" | "envelope";
+
+/**
+ * Two product lines. A greeting card is three faces around a fold and carries
+ * a written message; an invitation is two panels carrying structured event
+ * data that the image model bakes into the back.
+ */
+export type Product = "card" | "invitation";
+
+/** Invitations ship in both, and orientation reaches the whole stack. */
+export type Orientation = "portrait" | "landscape";
 
 export type Step = 1 | 2 | 3;
 
@@ -58,6 +69,14 @@ export type ImageNode = BaseNode & {
   scaleY: number;
   /** Placeholder label shown when we're not rendering a real asset. */
   label?: string;
+  /**
+   * How the bitmap meets its frame. "cover" centre-crops to fill without
+   * distorting — what a print pipeline does with bleed, and what lets one
+   * portrait render sit on a landscape trim.
+   */
+  fit?: "stretch" | "cover";
+  /** Rounding applied to the drawn bitmap, in card pixels. */
+  cornerRadius?: number;
 };
 
 export type ShapeNode = BaseNode & {
