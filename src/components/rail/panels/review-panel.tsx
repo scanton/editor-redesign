@@ -20,6 +20,7 @@ import {
 } from "@/lib/fulfilment";
 import { findLanguage } from "@/lib/languages";
 import { findLongForm } from "@/lib/long-form";
+import { filledRows } from "@/lib/event-details";
 import { priceOf } from "@/lib/pricing";
 import { useEditorStore, useNode } from "@/store/editor-store";
 import { useWarnings } from "@/lib/warnings";
@@ -44,9 +45,9 @@ export function ReviewPanel() {
   const [upsellOff, setUpsellOff] = useState(false);
   const product = useEditorStore((s) => s.product);
   const invitation = useEditorStore((s) => s.invitation);
-  const printedCount = invitation.details.filter(
-    (d) => d.onInvitation && d.value.trim(),
-  ).length;
+  // The list always carries a trailing blank row; it is not a detail yet.
+  const detailRows = filledRows(invitation.details);
+  const printedCount = detailRows.filter((d) => d.onInvitation).length;
 
   const message = useNode<TextNode>("inside_message");
   const signature = useNode<DrawNode>("inside_signature");
@@ -86,8 +87,8 @@ export function ReviewPanel() {
         {
           step: "Create",
           key: "On the artwork",
-          value: `${printedCount} of ${invitation.details.length} extra detail${
-            invitation.details.length === 1 ? "" : "s"
+          value: `${printedCount} of ${detailRows.length} extra detail${
+            detailRows.length === 1 ? "" : "s"
           }`,
         },
         {

@@ -1,23 +1,29 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import { useState } from "react";
-import { Eye, EyeOff, Info, Plus, Trash2, X } from "lucide-react";
+import { Eye, EyeOff, Info, Trash2, X } from "lucide-react";
 import {
   Field,
   PanelBody,
   Section,
   Segmented,
+  Select,
   Toggle,
   inputClass,
 } from "@/components/rail/panels/parts";
-import { springBouncy, springTight, staggerParent } from "@/lib/motion";
+import { springTight, staggerParent } from "@/lib/motion";
 import {
-  DETAIL_SUGGESTIONS,
+  DETAIL_TYPES,
+  MAX_DETAILS,
+  findDetailType,
+  labelOf,
+  type DetailRow,
+  type DetailType,
+} from "@/lib/event-details";
+import {
   QR_SHAPES,
   RSVP_METHODS,
   buildInvitationDetails,
-  type EventDetail,
   type RsvpMethod,
 } from "@/lib/invitation";
 import { useEditorStore } from "@/store/editor-store";
@@ -127,180 +133,201 @@ export function EventPanel() {
 
 /* -------------------------------------------------------------- the details */
 
+/**
+ * The dynamic detail list. A row is generic until it is given a type, and the
+ * type decides what the input is — a date picker for a date, options for a
+ * dress code, a label-and-value pair for something the catalogue has no name
+ * for. The list always ends in one blank row, so it grows as it is filled
+ * rather than waiting behind an Add button.
+ */
 function MoreDetails() {
   const details = useEditorStore((s) => s.invitation.details);
-  const addDetail = useEditorStore((s) => s.addDetail);
-  const [adding, setAdding] = useState(false);
-  const [custom, setCustom] = useState<string | null>(null);
+  const filled = details.filter((d) => d.type);
+  const full = filled.length >= MAX_DETAILS;
 
-  const taken = new Set(details.map((d) => d.label));
+  // Everything but a custom row is offered once.
+  const used = new Set(filled.map((d) => d.type));
 
   return (
-    <Section title="More details">
+    <Section
+      title="More details"
+      action={
+        <span
+          className={cn(
+            "rounded-full px-2.5 py-1 text-[11px] font-semibold tabular-nums",
+            full ? "bg-brand-red/10 text-brand-red" : "bg-surface-sunken text-ink-faint",
+          )}
+        >
+          {filled.length} / {MAX_DETAILS}
+        </span>
+      }
+    >
       <p className="mb-3 text-[12.5px] leading-snug text-ink-faint">
         The eye chooses what renders on the invitation. Hidden fields are still
         collected — they just live on your event page.
       </p>
 
-      <div className="flex flex-col gap-3">
-        {details.map((detail) => (
-          <DetailRow key={detail.id} detail={detail} />
-        ))}
-      </div>
-
-      {custom !== null && (
-        <motion.div
-          initial={{ opacity: 0, y: -6 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={springTight}
-          className="mt-3 flex items-center gap-2"
-        >
-          <input
-            autoFocus
-            className={inputClass}
-            placeholder="Field label"
-            value={custom}
-            onChange={(e) => setCustom(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key !== "Enter" || !custom.trim()) return;
-              addDetail(custom.trim(), null, true);
-              setCustom(null);
-            }}
-          />
-          <button
-            type="button"
-            disabled={!custom.trim()}
-            onClick={() => {
-              addDetail(custom.trim(), null, true);
-              setCustom(null);
-            }}
-            className="shrink-0 rounded-full bg-ink px-3.5 py-2 text-[13px] font-semibold text-white disabled:opacity-35"
-          >
-            Add
-          </button>
-          <button
-            type="button"
-            aria-label="Cancel"
-            onClick={() => setCustom(null)}
-            className="shrink-0 rounded-full p-2 text-ink-faint hover:bg-surface-sunken hover:text-ink"
-          >
-            <X size={15} />
-          </button>
-        </motion.div>
-      )}
-
-      <div className="relative mt-3">
-        <motion.button
-          type="button"
-          onClick={() => setAdding((v) => !v)}
-          whileHover={{ scale: 1.02 }}
-          whileTap={{ scale: 0.97 }}
-          transition={springTight}
-          className="flex items-center gap-1.5 rounded-full border border-hairline px-3 py-1.5 text-[13px] font-semibold text-ink hover:border-hairline-strong"
-        >
-          <Plus size={14} />
-          Add a detail
-        </motion.button>
-
-        <AnimatePresence>
-          {adding && (
-            <motion.div
-              initial={{ opacity: 0, y: -8, scale: 0.96 }}
-              animate={{ opacity: 1, y: 0, scale: 1 }}
-              exit={{ opacity: 0, y: -6, scale: 0.97, transition: { duration: 0.12 } }}
-              transition={springBouncy}
-              className="absolute left-0 top-full z-20 mt-1.5 w-full origin-top overflow-hidden rounded-[14px] border border-hairline bg-surface py-1 shadow-rail"
-            >
-              {DETAIL_SUGGESTIONS.map((s) => {
-                const used = taken.has(s.label);
-                return (
-                  <button
-                    key={s.label}
-                    type="button"
-                    disabled={used}
-                    onClick={() => {
-                      addDetail(s.label, s.slot, s.onInvitation);
-                      setAdding(false);
-                    }}
-                    className={cn(
-                      "flex w-full items-center justify-between gap-3 px-3 py-2 text-left text-[13.5px]",
-                      used
-                        ? "text-ink-faint"
-                        : "text-ink hover:bg-surface-sunken",
-                    )}
-                  >
-                    {s.label}
-                    <span className="text-[10.5px] uppercase tracking-[0.06em] text-ink-faint">
-                      {used ? "Added" : s.slot ? "Schema" : "Custom"}
-                    </span>
-                  </button>
-                );
-              })}
-              <button
-                type="button"
-                onClick={() => {
-                  setCustom("");
-                  setAdding(false);
-                }}
-                className="flex w-full items-center gap-2 border-t border-hairline px-3 py-2 text-left text-[13.5px] font-semibold text-ink hover:bg-surface-sunken"
-              >
-                <Plus size={13} />
-                Something else
-              </button>
-            </motion.div>
-          )}
+      <div className="flex flex-col gap-2.5">
+        <AnimatePresence initial={false}>
+          {details.map((row) => (
+            <DetailRow key={row.id} row={row} used={used} />
+          ))}
         </AnimatePresence>
       </div>
+
+      {full && (
+        <p className="mt-2.5 text-[12px] leading-snug text-ink-faint">
+          That is the most a back panel can hold and still be read across a
+          room. Remove one to add another.
+        </p>
+      )}
     </Section>
   );
 }
 
-function DetailRow({ detail }: { detail: EventDetail }) {
+function DetailRow({ row, used }: { row: DetailRow; used: Set<string> }) {
+  const setDetailType = useEditorStore((s) => s.setDetailType);
   const updateDetail = useEditorStore((s) => s.updateDetail);
   const removeDetail = useEditorStore((s) => s.removeDetail);
-  const shown = detail.onInvitation;
+
+  const definition = findDetailType(row.type);
+  const blank = !row.type;
+  const shown = row.onInvitation;
+
+  const typeOptions = DETAIL_TYPES.map((t) => ({
+    value: t.type,
+    label: t.label,
+    group: t.group,
+    disabled: !t.allowMultiple && t.type !== row.type && used.has(t.type),
+  }));
 
   return (
-    <div className="group">
-      <div className="mb-1.5 flex items-center gap-1.5">
-        <span className="text-[15px] font-bold text-ink">{detail.label}</span>
-        <button
-          type="button"
-          aria-pressed={shown}
-          title={shown ? "Shown on the invitation" : "Event page only"}
-          onClick={() => updateDetail(detail.id, { onInvitation: !shown })}
-          className={cn(
-            "rounded-full p-1 transition-colors",
-            shown ? "text-ink hover:bg-surface-sunken" : "text-ink-faint hover:text-ink-soft",
-          )}
-        >
-          {shown ? <Eye size={14} /> : <EyeOff size={14} />}
-        </button>
-        <button
-          type="button"
-          aria-label={`Remove ${detail.label}`}
-          onClick={() => removeDetail(detail.id)}
-          className="rounded-full p-1 text-ink-faint opacity-0 transition-opacity hover:text-brand-red focus-visible:opacity-100 group-hover:opacity-100"
-        >
-          <X size={14} />
-        </button>
-        {!shown && (
-          <span className="ml-auto text-[10.5px] uppercase tracking-[0.06em] text-ink-faint">
-            Event page only
-          </span>
+    <motion.div
+      layout
+      initial={{ opacity: 0, y: -6 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0, height: 0, marginBottom: -10 }}
+      transition={springTight}
+      className={cn(
+        "rounded-[14px] border p-2.5",
+        blank ? "border-dashed border-hairline-strong" : "border-hairline",
+      )}
+    >
+      <div className="flex items-center gap-1.5">
+        <Select
+          className="min-w-0 flex-1"
+          placeholder="Add a detail…"
+          options={typeOptions}
+          value={row.type}
+          onChange={(type) => setDetailType(row.id, type)}
+        />
+
+        {!blank && (
+          <>
+            <button
+              type="button"
+              aria-pressed={shown}
+              title={shown ? "Shown on the invitation" : "Event page only"}
+              onClick={() => updateDetail(row.id, { onInvitation: !shown })}
+              className={cn(
+                "shrink-0 rounded-full p-1.5 transition-colors",
+                shown
+                  ? "text-ink hover:bg-surface-sunken"
+                  : "text-ink-faint hover:text-ink-soft",
+              )}
+            >
+              {shown ? <Eye size={15} /> : <EyeOff size={15} />}
+            </button>
+            <button
+              type="button"
+              aria-label={`Remove ${labelOf(row)}`}
+              onClick={() => removeDetail(row.id)}
+              className="shrink-0 rounded-full p-1.5 text-ink-faint hover:text-brand-red"
+            >
+              <X size={15} />
+            </button>
+          </>
         )}
       </div>
 
-      {detail.slot === "schedule" ? (
-        <ScheduleRows />
-      ) : (
+      {definition && (
+        <div className="mt-2">
+          <DetailInput row={row} definition={definition} />
+          {!shown && (
+            <p className="mt-1.5 text-[10.5px] uppercase tracking-[0.06em] text-ink-faint">
+              Event page only
+            </p>
+          )}
+        </div>
+      )}
+    </motion.div>
+  );
+}
+
+/** The input a type asks for. */
+function DetailInput({
+  row,
+  definition,
+}: {
+  row: DetailRow;
+  definition: DetailType;
+}) {
+  const updateDetail = useEditorStore((s) => s.updateDetail);
+  const set = (patch: Partial<DetailRow>) => updateDetail(row.id, patch);
+
+  if (definition.inputKind === "schedule") return <ScheduleRows />;
+
+  if (definition.inputKind === "custom") {
+    return (
+      <div className="flex flex-col gap-2">
         <input
           className={inputClass}
-          value={detail.value}
-          onChange={(e) => updateDetail(detail.id, { value: e.target.value })}
+          placeholder="What to call it"
+          value={row.customLabel ?? ""}
+          onChange={(e) => set({ customLabel: e.target.value })}
         />
-      )}
-    </div>
+        <input
+          className={inputClass}
+          placeholder="What it says"
+          value={row.value}
+          onChange={(e) => set({ value: e.target.value })}
+        />
+      </div>
+    );
+  }
+
+  if (definition.inputKind === "select") {
+    return (
+      <Select
+        placeholder={`Choose a ${definition.label.toLowerCase()}`}
+        options={(definition.options ?? []).map((o) => ({ value: o, label: o }))}
+        value={row.value}
+        onChange={(value) => set({ value })}
+      />
+    );
+  }
+
+  if (definition.inputKind === "textarea") {
+    return (
+      <textarea
+        className={cn(inputClass, "min-h-[72px] resize-y")}
+        placeholder={definition.label}
+        value={row.value}
+        onChange={(e) => set({ value: e.target.value })}
+      />
+    );
+  }
+
+  return (
+    <input
+      className={inputClass}
+      type={definition.inputKind}
+      placeholder={
+        definition.inputKind === "url" ? "https://" : definition.label
+      }
+      value={row.value}
+      onChange={(e) => set({ value: e.target.value })}
+    />
   );
 }
 
@@ -315,25 +342,25 @@ function ScheduleRows() {
   return (
     <div className="flex flex-col gap-2">
       {rows.map((row, i) => (
-        <div key={i} className="flex items-center gap-2">
+        <div key={i} className="flex items-center gap-1.5">
           <input
-            className={cn(inputClass, "w-[92px] shrink-0")}
+            className={cn(inputClass, "w-[86px] shrink-0")}
             placeholder="9:00 PM"
             value={row.time}
             onChange={(e) => patch(i, { time: e.target.value })}
           />
           <input
-            className={inputClass}
+            className={cn(inputClass, "min-w-0 flex-1")}
             placeholder="Doors open"
             value={row.item}
             onChange={(e) => patch(i, { item: e.target.value })}
           />
           <button
             type="button"
-            aria-label="Remove row"
+            aria-label="Remove line"
             disabled={rows.length === 1}
             onClick={() => setSchedule(rows.filter((_, j) => j !== i))}
-            className="shrink-0 rounded-full p-2 text-ink-faint hover:text-brand-red disabled:opacity-30"
+            className="shrink-0 rounded-full p-1.5 text-ink-faint hover:text-brand-red disabled:opacity-30"
           >
             <Trash2 size={14} />
           </button>

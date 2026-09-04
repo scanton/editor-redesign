@@ -1,3 +1,8 @@
+import {
+  findDetailType,
+  labelOf,
+  type DetailRow,
+} from "./event-details";
 import type { CardDoc, Orientation } from "./types";
 
 /**
@@ -51,51 +56,8 @@ export type InvitationDetails = {
  */
 export type SchemaSlot = "dresscode" | "instructions" | "schedule";
 
-/**
- * One row in "More details". `onInvitation` is the eye toggle: on means the
- * image model bakes it into the back panel, off means it lives on the event
- * page only. Both are collected either way — the toggle decides what gets
- * printed, not what gets stored.
- */
-export type EventDetail = {
-  id: string;
-  label: string;
-  value: string;
-  onInvitation: boolean;
-  /** Which named schema field this fills, or null for a custom field. */
-  slot: SchemaSlot | null;
-};
-
 /** Rows in a schedule detail, kept as text so the demo stays editable. */
 export type ScheduleRow = { time: string; item: string };
-
-/* ------------------------------------------------------------- suggestions */
-
-export type DetailSuggestion = {
-  label: string;
-  slot: SchemaSlot | null;
-  /** Whether it lands on the artwork by default. */
-  onInvitation: boolean;
-  hint: string;
-};
-
-/**
- * What "+ Add a detail" offers. The first three fill named schema slots; the
- * rest become custom fields. Defaults follow what usually belongs in print —
- * a dress code goes on the card, parking notes do not.
- */
-export const DETAIL_SUGGESTIONS: DetailSuggestion[] = [
-  { label: "Dress code", slot: "dresscode", onInvitation: true, hint: "Schema field" },
-  { label: "Note to guests", slot: "instructions", onInvitation: false, hint: "Schema field" },
-  { label: "Schedule", slot: "schedule", onInvitation: false, hint: "Schema field" },
-  { label: "Cost per person", slot: null, onInvitation: true, hint: "Custom field" },
-  { label: "Registry", slot: null, onInvitation: false, hint: "Custom field" },
-  { label: "Playlist", slot: null, onInvitation: false, hint: "Custom field" },
-  { label: "Food situation", slot: null, onInvitation: false, hint: "Custom field" },
-  { label: "Parking", slot: null, onInvitation: false, hint: "Custom field" },
-  { label: "Accommodations", slot: null, onInvitation: false, hint: "Custom field" },
-  { label: "Website", slot: null, onInvitation: false, hint: "Custom field" },
-];
 
 export const RSVP_METHODS: { value: RsvpMethod; label: string; placeholder: string }[] = [
   { value: "url", label: "Link", placeholder: "hstmp.co/funeral-youth" },
@@ -289,7 +251,7 @@ export type InvitationInput = {
   time: string;
   locationName: string;
   address: string;
-  details: EventDetail[];
+  details: DetailRow[];
   schedule: ScheduleRow[];
   rsvpOn: boolean;
   rsvpMethod: RsvpMethod;
@@ -313,10 +275,13 @@ export type InvitationInput = {
  * where to put them.
  */
 export function buildInvitationDetails(inv: InvitationInput): InvitationDetails {
-  const printed = inv.details.filter((d) => d.onInvitation);
+  // Only rows that have been given a type, and only those meant to be printed.
+  const printed = inv.details.filter((d) => d.type && d.onInvitation);
+  const slotOf = (row: DetailRow) => findDetailType(row.type)?.slot ?? null;
 
   const slotValue = (slot: SchemaSlot) =>
-    printed.find((d) => d.slot === slot && d.value.trim())?.value.trim() ?? null;
+    printed.find((d) => slotOf(d) === slot && d.value.trim())?.value.trim() ??
+    null;
 
   const custom: { label: string; value: string }[] = [];
   if (inv.tagline.trim())
@@ -324,10 +289,10 @@ export function buildInvitationDetails(inv: InvitationInput): InvitationDetails 
   if (inv.rsvpOn && inv.rsvpLine.trim())
     custom.push({ label: "rsvpLine", value: inv.rsvpLine.trim() });
   for (const d of printed)
-    if (!d.slot && d.value.trim())
-      custom.push({ label: d.label, value: d.value.trim() });
+    if (!slotOf(d) && d.value.trim())
+      custom.push({ label: labelOf(d), value: d.value.trim() });
 
-  const hasSchedule = printed.some((d) => d.slot === "schedule");
+  const hasSchedule = printed.some((d) => slotOf(d) === "schedule");
 
   return {
     eventName: inv.eventName.trim(),

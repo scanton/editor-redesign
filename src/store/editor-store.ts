@@ -6,12 +6,15 @@ import {
   DEFAULT_QR,
   clampQr,
   invitationDoc,
-  type EventDetail,
   type QrShape,
   type RsvpMethod,
   type ScheduleRow,
-  type SchemaSlot,
 } from "@/lib/invitation";
+import {
+  MAX_DETAILS,
+  findDetailType,
+  type DetailRow,
+} from "@/lib/event-details";
 import { SWITCHER_INSET, TOOLBAR_INSET } from "@/lib/card-transform";
 import {
   defaultLongFormRect,
@@ -88,8 +91,12 @@ type EditorState = {
     time: string;
     locationName: string;
     address: string;
-    /** Optional schema fields and custom rows, each with its eye toggle. */
-    details: EventDetail[];
+    /**
+     * The dynamic detail list. Rows carry a type rather than a fixed label, so
+     * a date gets a date picker and a dress code gets its options. The last row
+     * is always blank, which is what lets the list grow without an Add button.
+     */
+    details: DetailRow[];
     schedule: ScheduleRow[];
     rsvpOn: boolean;
     rsvpMethod: RsvpMethod;
@@ -111,8 +118,9 @@ type EditorState = {
    */
   setInvitation: (patch: Partial<EditorState["invitation"]>) => void;
   setOrientation: (orientation: Orientation) => void;
-  addDetail: (label: string, slot: SchemaSlot | null, onInvitation: boolean) => void;
-  updateDetail: (id: string, patch: Partial<EventDetail>) => void;
+  /** Give a blank row a type, or change one — which resets what it holds. */
+  setDetailType: (id: string, type: string) => void;
+  updateDetail: (id: string, patch: Partial<DetailRow>) => void;
   removeDetail: (id: string) => void;
   setSchedule: (rows: ScheduleRow[]) => void;
   moveQr: (pos: { x: number; y: number }, width?: number) => void;
@@ -288,6 +296,21 @@ function cloneDoc(doc: CardDoc): CardDoc {
 }
 
 /**
+ * The detail list always ends in one blank row, unless it is full — which is
+ * what makes it grow as you fill it instead of needing an Add button.
+ */
+function withBlankRow(rows: DetailRow[]): DetailRow[] {
+  const filled = rows.filter((r) => r.type);
+  if (filled.length >= MAX_DETAILS) return filled;
+  const blanks = rows.filter((r) => !r.type);
+  return blanks.length === 1 ? rows : [...filled, blankRow()];
+}
+
+function blankRow(): DetailRow {
+  return { id: uid("detail"), type: "", value: "", onInvitation: true };
+}
+
+/**
  * Kept outside the store: parking the other product's document is bookkeeping,
  * not state anything renders from.
  */
@@ -378,13 +401,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     locationName: "The Underground Bar",
     address: "Brooklyn, NY",
     details: [
-      {
-        id: "d_dress",
-        label: "Dress code",
-        value: "All Black",
-        onInvitation: true,
-        slot: "dresscode",
-      },
+      { id: "d_dress", type: "dressCode", value: "Black tie", onInvitation: true },
+      { id: "d_blank", type: "", value: "", onInvitation: true },
     ],
     schedule: [],
     rsvpOn: true,
@@ -430,27 +448,36 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       };
     }),
 
-  addDetail: (label, slot, onInvitation) =>
-    set((s) => ({
-      invitation: {
-        ...s.invitation,
-        details: [
-          ...s.invitation.details,
-          { id: uid("detail"), label, value: "", onInvitation, slot },
-        ],
-        // An empty row changes nothing on the artwork until it says something.
-        stale: s.invitation.stale,
-      },
-    })),
+  // Choosing a type is what turns the trailing blank row into a real one, so
+  // this is also where the next blank row comes from.
+  setDetailType: (id, type) =>
+    set((s) => {
+      const definition = findDetailType(type);
+      const details = s.invitation.details.map((d) =>
+        d.id === id
+          ? {
+              id: d.id,
+              type,
+              value: "",
+              customLabel: undefined,
+              // Each type knows whether it usually belongs in print.
+              onInvitation: definition?.onInvitation ?? true,
+            }
+          : d,
+      );
+      return {
+        invitation: { ...s.invitation, details: withBlankRow(details) },
+      };
+    }),
 
   updateDetail: (id, patch) =>
     set((s) => {
+      const before = s.invitation.details.find((d) => d.id === id);
       const details = s.invitation.details.map((d) =>
         d.id === id ? { ...d, ...patch } : d,
       );
-      const before = s.invitation.details.find((d) => d.id === id);
-      // Editing a hidden row is bookkeeping; showing or hiding one, or
-      // editing a shown one, changes what gets printed.
+      // Editing a hidden row is bookkeeping; showing or hiding one, or editing
+      // a shown one, changes what gets printed.
       const touchesArt =
         !!before &&
         (before.onInvitation ||
@@ -458,7 +485,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         invitation: {
           ...s.invitation,
-          details,
+          details: withBlankRow(details),
           stale: s.invitation.stale || touchesArt,
         },
       };
@@ -470,8 +497,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       return {
         invitation: {
           ...s.invitation,
-          details: s.invitation.details.filter((d) => d.id !== id),
-          stale: s.invitation.stale || (!!gone?.onInvitation && !!gone.value),
+          details: withBlankRow(
+            s.invitation.details.filter((d) => d.id !== id),
+          ),
+          stale:
+            s.invitation.stale || (!!gone?.onInvitation && !!gone.value.trim()),
         },
       };
     }),
@@ -479,7 +509,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setSchedule: (schedule) =>
     set((s) => {
       const shown = s.invitation.details.some(
-        (d) => d.slot === "schedule" && d.onInvitation,
+        (d) => d.type === "eventSchedule" && d.onInvitation,
       );
       return {
         invitation: {
