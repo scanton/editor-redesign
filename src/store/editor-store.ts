@@ -8,6 +8,7 @@ import {
   invitationDoc,
   type QrShape,
   type RsvpMethod,
+  type TrimId,
   type ScheduleRow,
 } from "@/lib/invitation";
 import {
@@ -88,6 +89,8 @@ type EditorState = {
    */
   invitation: {
     orientation: Orientation;
+    /** How the printed copy is cut. A die, not artwork — see setTrim. */
+    trim: TrimId;
     /**
      * The dynamic detail list. Rows carry a type rather than a fixed label, so
      * a date gets a date picker and a dress code gets its options. The last row
@@ -115,6 +118,7 @@ type EditorState = {
    */
   setInvitation: (patch: Partial<EditorState["invitation"]>) => void;
   setOrientation: (orientation: Orientation) => void;
+  setTrim: (trim: TrimId) => void;
   /** Give a blank row a type, or change one — which resets what it holds. */
   setDetailType: (id: string, type: string) => void;
   updateDetail: (id: string, patch: Partial<DetailRow>) => void;
@@ -423,6 +427,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   invitation: {
     orientation: "portrait",
+    trim: "rounded",
     details: seedDetails(),
     schedule: [],
     rsvpOn: true,
@@ -471,6 +476,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   // Choosing a type is what turns the trailing blank row into a real one, so
   // this is also where the next blank row comes from.
+  // The render bleeds past the trim line and the die takes the corners off
+  // afterwards, so cutting them differently never costs a re-render.
+  setTrim: (trim) => set((s) => ({ invitation: { ...s.invitation, trim } })),
+
   setDetailType: (id, type) =>
     set((s) => {
       const definition = findDetailType(type);

@@ -1,5 +1,6 @@
 import {
   CalendarHeart,
+  Frame,
   ImagePlay,
   MapPin,
   Printer,
@@ -72,6 +73,12 @@ export const TOOLS: ToolDef[] = [
     label: "Card type",
     icon: Sparkles,
     blurb: "Digital or printed — both stay saved.",
+  },
+  {
+    id: "trim",
+    label: "Trim",
+    icon: Frame,
+    blurb: "How the printed invitation is cut.",
   },
   {
     id: "background",

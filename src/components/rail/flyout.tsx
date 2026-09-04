@@ -19,6 +19,7 @@ import { SignaturePanel } from "@/components/rail/panels/signature-panel";
 import { RevealPanel } from "@/components/rail/panels/reveal-panel";
 import { ReviewPanel } from "@/components/rail/panels/review-panel";
 import { StylesPanel } from "@/components/rail/panels/styles-panel";
+import { TrimPanel } from "@/components/rail/panels/trim-panel";
 import { TranslationsPanel } from "@/components/rail/panels/translations-panel";
 import { bounceOut, flyoutClose } from "@/lib/motion";
 import { FLYOUT_WIDTH } from "@/lib/layout";
@@ -33,6 +34,7 @@ const PANELS: Record<ToolId, React.ComponentType> = {
   translations: TranslationsPanel,
   longform: LongFormPanel,
   cardtype: CardTypePanel,
+  trim: TrimPanel,
   background: BackgroundPanel,
   envelope: EnvelopePanel,
   reveal: RevealPanel,

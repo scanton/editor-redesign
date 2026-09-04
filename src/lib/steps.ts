@@ -30,10 +30,14 @@ export function stepTools(
     return product === "invitation"
       ? ["styles", "event", "translations"]
       : ["styles", "message", "longform", "signature", "translations"];
-  if (step === 2)
-    return cardType === "digital"
-      ? ["cardtype", "background", "envelope", "reveal", "cover"]
+  if (step === 2) {
+    if (cardType === "digital")
+      return ["cardtype", "background", "envelope", "reveal", "cover"];
+    // Only a printed invitation is cut two ways; greeting cards run one trim.
+    return product === "invitation"
+      ? ["cardtype", "trim", "envelope"]
       : ["cardtype", "envelope"];
+  }
   return cardType === "digital"
     ? ["delivery", "recipients", "review"]
     : ["delivery", "recipients", "printopts", "review"];
@@ -56,7 +60,12 @@ export const STEP_DEFAULT_TOOL: Record<Step, ToolId | null> = {
 
 export function stepOf(tool: ToolId): Step {
   if (FINISH_TOOLS.includes(tool)) return 3;
-  if (tool === "cardtype" || tool === "envelope" || DIGITAL_ONLY.includes(tool))
+  if (
+    tool === "cardtype" ||
+    tool === "trim" ||
+    tool === "envelope" ||
+    DIGITAL_ONLY.includes(tool)
+  )
     return 2;
   return 1;
 }
