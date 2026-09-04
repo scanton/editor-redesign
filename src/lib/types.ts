@@ -8,6 +8,7 @@ export type ToolId =
   | "translations"
   | "longform"
   | "cardtype"
+  | "trim"
   | "background"
   | "envelope"
   | "reveal"

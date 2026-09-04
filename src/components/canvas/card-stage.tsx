@@ -14,7 +14,7 @@ import {
 import useImage from "use-image";
 import { useFontFamilies } from "@/components/canvas/use-font-families";
 import { cardTransform } from "@/lib/card-transform";
-import { QR_IMAGE, QR_SHAPES } from "@/lib/invitation";
+import { QR_IMAGE, QR_SHAPES, trimRadius } from "@/lib/invitation";
 import type { EditorNode, ImageNode } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
 
@@ -29,6 +29,13 @@ export default function CardStage({ width, height }: Props) {
   const zoom = useEditorStore((s) => s.zoom);
   const face = useEditorStore((s) => s.doc.faces[s.face]);
   const nudgeZoom = useEditorStore((s) => s.nudgeZoom);
+  // Only a printed invitation is cut two ways. Everything else keeps the soft
+  // corner that reads as paper rather than a die.
+  const corner = useEditorStore((s) =>
+    s.product === "invitation" && s.cardType === "printed"
+      ? trimRadius(s.invitation.trim)
+      : 8,
+  );
 
   const resolveFont = useFontFamilies();
   const transform = cardTransform({ width, height }, face, zoom);
@@ -54,7 +61,7 @@ export default function CardStage({ width, height }: Props) {
           <Rect
             width={face.width}
             height={face.height}
-            cornerRadius={8}
+            cornerRadius={corner}
             fill={face.backgroundAccent ? undefined : face.background}
             fillLinearGradientStartPoint={{ x: 0, y: 0 }}
             fillLinearGradientEndPoint={{ x: 0, y: face.height }}
@@ -71,7 +78,12 @@ export default function CardStage({ width, height }: Props) {
           />
 
           {face.nodes.map((node) => (
-            <NodeView key={node.id} node={node} resolveFont={resolveFont} />
+            <NodeView
+              key={node.id}
+              node={node}
+              resolveFont={resolveFont}
+              corner={corner}
+            />
           ))}
 
           {/* Composited onto the finished artwork rather than rendered into
@@ -86,9 +98,12 @@ export default function CardStage({ width, height }: Props) {
 function NodeView({
   node,
   resolveFont,
+  corner,
 }: {
   node: EditorNode;
   resolveFont: (family: string) => string;
+  /** The card's own trim, so full-bleed artwork is cut with it. */
+  corner: number;
 }) {
   const common = {
     id: node.id,
@@ -174,8 +189,9 @@ function NodeView({
     );
   }
 
-  // The artwork is the flat render — it is the card, not something on it.
-  return <ArtworkNode node={node} />;
+  // The artwork is the flat render — it is the card, not something on it, so
+  // it takes the card's trim rather than overhanging the cut corners.
+  return <ArtworkNode node={node} corner={corner} />;
 }
 
 /**
@@ -185,7 +201,7 @@ function NodeView({
  * "cover" centre-crops the bitmap into its frame instead of stretching it —
  * what lets one portrait render sit on a landscape trim without distorting.
  */
-function ArtworkNode({ node }: { node: ImageNode }) {
+function ArtworkNode({ node, corner }: { node: ImageNode; corner: number }) {
   const [image] = useImage(node.src);
   if (!image) return null;
 
@@ -202,7 +218,7 @@ function ArtworkNode({ node }: { node: ImageNode }) {
       width={node.width}
       height={node.height}
       crop={crop}
-      cornerRadius={node.cornerRadius}
+      cornerRadius={node.cornerRadius ?? corner}
       rotation={node.rotation}
       opacity={node.opacity}
     />

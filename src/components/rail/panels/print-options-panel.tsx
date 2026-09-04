@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import { Minus, Plus } from "lucide-react";
 import { PanelBody, Section, Toggle } from "@/components/rail/panels/parts";
 import { PRINT_SPEC } from "@/lib/fulfilment";
+import { findTrim } from "@/lib/invitation";
 import { staggerParent } from "@/lib/motion";
 import { findEnvelopeLook } from "@/lib/digital-card";
 import {
@@ -26,6 +27,7 @@ export function PrintOptionsPanel() {
   const look = useEditorStore((s) => findEnvelopeLook(s.digital.envelopeLook));
   const product = useEditorStore((s) => s.product);
   const orientation = useEditorStore((s) => s.invitation.orientation);
+  const trim = useEditorStore((s) => findTrim(s.invitation.trim));
   const envelopeAddOn = useEditorStore((s) => s.envelopeAddOn);
   const setEnvelopeAddOn = useEditorStore((s) => s.setEnvelopeAddOn);
   const isInvitation = product === "invitation";
@@ -41,7 +43,14 @@ export function PrintOptionsPanel() {
         ] as [string, string][])
       : []),
     ["Stock", PRINT_SPEC.stock],
-    ["Corners", PRINT_SPEC.corners],
+    [
+      "Corners",
+      isInvitation
+        ? trim.radiusIn > 0
+          ? `${trim.label} · ${trim.radiusIn}" radius`
+          : trim.label
+        : PRINT_SPEC.corners,
+    ],
     [
       "Mailer",
       `${envelope.flap === "euro" ? "Euro flap" : "Square flap"} · ${
@@ -151,8 +160,9 @@ export function PrintOptionsPanel() {
             ))}
           </dl>
           <p className="mt-2.5 text-[12px] leading-snug text-ink-faint">
-            One stock, square corners. Changing either is a production change,
-            not a customer choice.
+            {isInvitation
+              ? "One stock, cut the way you chose under Trim. The stock is a production decision, not a customer one."
+              : "One stock, square corners. Changing either is a production change, not a customer choice."}
           </p>
         </Section>
       </motion.div>

@@ -21,6 +21,7 @@ import {
 import { findLanguage } from "@/lib/languages";
 import { findLongForm } from "@/lib/long-form";
 import { filledRows, printedRows, valueOfType } from "@/lib/event-details";
+import { findTrim } from "@/lib/invitation";
 import { priceOf } from "@/lib/pricing";
 import { useEditorStore, useNode } from "@/store/editor-store";
 import { useWarnings } from "@/lib/warnings";
@@ -114,6 +115,15 @@ export function ReviewPanel() {
             invitation.orientation === "portrait" ? "5×7 portrait" : "7×5 landscape"
           }`,
         },
+        ...(isDigital
+          ? []
+          : [
+              {
+                step: "Personalize",
+                key: "Trim",
+                value: findTrim(invitation.trim).label,
+              },
+            ]),
       ]
     : [
         {

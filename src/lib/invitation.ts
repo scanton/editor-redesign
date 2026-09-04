@@ -74,6 +74,49 @@ export const RSVP_METHODS: { value: RsvpMethod; label: string; placeholder: stri
   { value: "phone", label: "Phone", placeholder: "(555) 019-2847" },
 ];
 
+/* ----------------------------------------------------------------- the trim */
+
+export type TrimId = "square" | "rounded";
+
+/**
+ * How the printed invitation is cut. Greeting cards run one trim, but
+ * invitations are offered both — a rounded die softens a heavy stock and reads
+ * as stationery rather than a flyer.
+ *
+ * The radius is a cut, not artwork: the render bleeds past the trim line and
+ * the die takes the corners off afterwards, so changing it never asks the
+ * model for anything.
+ */
+export const TRIMS: {
+  id: TrimId;
+  label: string;
+  /** Corner radius in inches, 0 for a square cut. */
+  radiusIn: number;
+  note: string;
+}[] = [
+  {
+    id: "square",
+    label: "Square",
+    radiusIn: 0,
+    note: "A clean guillotine cut. Sharp corners, and the artwork runs right into them.",
+  },
+  {
+    id: "rounded",
+    label: "Rounded",
+    radiusIn: 0.25,
+    note: "A quarter-inch die. Softer in the hand, kinder to envelopes, and it will not dog-ear.",
+  },
+];
+
+export function findTrim(id: TrimId) {
+  return TRIMS.find((t) => t.id === id)!;
+}
+
+/** The trim radius in card pixels, or 0 when the corners are square. */
+export function trimRadius(id: TrimId) {
+  return findTrim(id).radiusIn * INVITATION_PPI;
+}
+
 /* ------------------------------------------------------------- the QR code */
 
 /** Offered shapes for the code itself — the design has to live with it. */
