@@ -17,8 +17,6 @@ import {
   toScreenRect,
 } from "@/lib/card-transform";
 import {
-  appendPoint,
-  boundsOf,
   pointInPolygon,
   rectToSvgPoints,
   toSvgPoints,
@@ -33,13 +31,10 @@ const PROMPT_WIDTH = 288;
 const PROMPT_GAP = 12;
 
 /**
- * Marking out a region of the card to hand to the agent. Three ways in, one
- * outcome — the spotlight, the prompt, the submit and the re-render shimmer are
- * identical whichever you used:
- *
- *   element  — click a segment the model already found
- *   annotate — drag a rectangle
- *   wand     — trace any shape freehand
+ * Marking out a region of the card by outline — click a segment the model
+ * already found, or drag a rectangle around something it did not. Painting a
+ * region is the brush layer's job; both end in the same prompt and the same
+ * re-render shimmer.
  *
  * DOM rather than Konva, because Konva can't host a text input.
  */
@@ -74,7 +69,7 @@ export function RegionLayer({
   const [drawing, setDrawing] = useState(false);
   const maskId = useId();
 
-  const drawingMode = mode === "annotate" || mode === "wand";
+  const drawingMode = mode === "annotate";
   const picking = mode === "element";
   const marking = drawingMode || picking;
   const segments = face.segments ?? [];
@@ -144,11 +139,6 @@ export function RegionLayer({
     const zero = { x: start.x, y: start.y, width: 0, height: 0 };
     draftRef.current = zero;
     setDraft(zero);
-
-    if (mode === "wand") {
-      pathRef.current = [start.x, start.y];
-      setLasso(pathRef.current);
-    }
   };
 
   const onPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -162,14 +152,6 @@ export function RegionLayer({
     const origin = originRef.current;
     if (!origin) return;
     const current = clampToCard(toCardPoint(localPoint(e), transform));
-
-    if (mode === "wand") {
-      pathRef.current = appendPoint(pathRef.current, current.x, current.y);
-      draftRef.current = boundsOf(pathRef.current);
-      setLasso(pathRef.current);
-      setDraft(draftRef.current);
-      return;
-    }
     draftRef.current = rectBetween(origin, current);
     setDraft(draftRef.current);
   };
@@ -273,12 +255,13 @@ export function RegionLayer({
           />
         )}
 
-        {/* Regions currently being re-rendered by the agent. An erase shows the
-            painted strokes; everything else shows the marked outline. */}
+        {/* Regions currently being re-rendered by the agent. Anything painted
+            shimmers as the strokes that marked it; anything outlined shimmers
+            as its outline. */}
         {rendering.map((request) =>
-          request.kind === "erase" ? (
+          request.strokes ? (
             <g key={request.id} className="animate-pulse">
-              {(request.strokes ?? []).map((stroke, i) => (
+              {request.strokes.map((stroke, i) => (
                 <polyline
                   key={i}
                   points={toSvgPoints(stroke, transform)}
@@ -381,9 +364,7 @@ export function RegionLayer({
           >
             {mode === "element"
               ? hovered?.label + " · click to edit it"
-              : mode === "wand"
-                ? "Draw around what you want changed · Esc to exit"
-                : "Drag a box around what you want changed · Esc to exit"}
+              : "Drag a box around what you want changed · Esc to exit"}
           </motion.p>
         )}
       </AnimatePresence>

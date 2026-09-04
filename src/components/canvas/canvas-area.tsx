@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { EraserLayer } from "@/components/canvas/eraser-layer";
+import { BrushLayer } from "@/components/canvas/brush-layer";
 import { RegionLayer } from "@/components/canvas/region-layer";
 import { CanvasTools } from "@/components/canvas/canvas-tools";
 import { EnvelopePreview } from "@/components/canvas/envelope-preview";
@@ -23,6 +23,7 @@ export function CanvasArea() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const face = useEditorStore((s) => s.face);
+  const canvasMode = useEditorStore((s) => s.canvasMode);
   // The face switcher decides what the canvas shows; the envelope is a face of
   // the digital card, not a takeover.
   const showEnvelope = useEditorStore((s) => s.surface === "envelope");
@@ -96,7 +97,11 @@ export function CanvasArea() {
 
         {/* Marking up regions is a card operation — no meaning on the envelope. */}
         {!showEnvelope && size.width > 0 && <RegionLayer viewport={size} />}
-        {!showEnvelope && size.width > 0 && <EraserLayer viewport={size} />}
+        {/* Keyed by mode so switching brushes starts clean rather than
+            carrying the last instruction across. */}
+        {!showEnvelope && size.width > 0 && (
+          <BrushLayer key={canvasMode} viewport={size} />
+        )}
       </div>
 
       <AnimatePresence>

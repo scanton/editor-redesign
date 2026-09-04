@@ -43,7 +43,7 @@ import type {
   FaceId,
   ToolId,
 } from "@/lib/types";
-import { boundsOf } from "@/lib/lasso";
+import { boundsOf, paintedBounds } from "@/lib/lasso";
 import { STEP_DEFAULT_TOOL, stepTools } from "@/lib/steps";
 import type {
   DigitalDelivery,
@@ -260,12 +260,16 @@ type EditorState = {
   submitAnnotation: (instruction: string) => void;
   resolveAnnotation: (id: string) => void;
 
-  /** Magic eraser: paint over what should go, no instruction needed. */
-  eraserStrokes: number[][];
-  setEraserStrokes: (strokes: number[][]) => void;
-  eraserSize: number;
-  setEraserSize: (size: number) => void;
-  clearEraser: () => void;
+  /**
+   * One brush, two tools. The highlighter paints the area it wants changed and
+   * the eraser paints the area it wants gone — the mask is what the brush
+   * covered, which is easier to aim than tracing an outline around it.
+   */
+  brushStrokes: number[][];
+  setBrushStrokes: (strokes: number[][]) => void;
+  brushSize: number;
+  setBrushSize: (size: number) => void;
+  clearBrush: () => void;
   submitErase: () => void;
 
   /** Translations: pick a target language, agent re-renders every face. */
@@ -404,7 +408,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       canvasMode: "element",
       draftAnnotation: null,
       draftLasso: null,
-      eraserStrokes: [],
+      brushStrokes: [],
       zoomTouched: false,
     });
     get().maybeFit();
@@ -577,7 +581,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       canvasMode: "element",
       draftAnnotation: null,
       draftLasso: null,
-      eraserStrokes: [],
+      brushStrokes: [],
     });
   },
   cardType: "printed",
@@ -739,7 +743,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       canvasMode: "element",
       draftAnnotation: null,
       draftLasso: null,
-      eraserStrokes: [],
+      brushStrokes: [],
     })),
 
   setTool: (activeTool) =>
@@ -854,7 +858,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       draftAnnotation: null,
       draftLasso: null,
       draftSegmentLabel: null,
-      eraserStrokes: [],
+      brushStrokes: [],
       hoverSegment: null,
     }),
 
@@ -876,14 +880,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   annotationRequests: [],
   submitAnnotation: (instruction) => {
-    const { draftAnnotation, draftLasso, draftSegmentLabel, face } = get();
-    if (!draftAnnotation || !instruction.trim()) return;
+    const {
+      canvasMode,
+      draftAnnotation,
+      draftLasso,
+      draftSegmentLabel,
+      brushStrokes,
+      brushSize,
+      face,
+    } = get();
+    // A highlighted region is defined by paint; a boxed or picked one by a
+    // rectangle or an outline. Either way the agent gets one region and one
+    // instruction.
+    const painted = canvasMode === "highlighter" && brushStrokes.length > 0;
+    const rect = painted
+      ? paintedBounds(brushStrokes, brushSize)
+      : draftAnnotation;
+    if (!rect || !instruction.trim()) return;
 
     const request: AnnotationRequest = {
       id: uid("ann"),
       face,
-      rect: draftAnnotation,
-      points: draftLasso ?? undefined,
+      rect,
+      points: painted ? undefined : (draftLasso ?? undefined),
+      strokes: painted ? brushStrokes : undefined,
+      brushSize: painted ? brushSize : undefined,
       segmentLabel: draftSegmentLabel ?? undefined,
       instruction: instruction.trim(),
       kind: "edit",
@@ -895,6 +916,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       draftAnnotation: null,
       draftLasso: null,
       draftSegmentLabel: null,
+      brushStrokes: [],
       canvasMode: "element",
       agentOpen: true,
     }));
@@ -904,30 +926,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     setTimeout(() => get().resolveAnnotation(request.id), 2400);
   },
 
-  eraserStrokes: [],
-  setEraserStrokes: (eraserStrokes) => set({ eraserStrokes }),
-  eraserSize: 90,
-  setEraserSize: (eraserSize) => set({ eraserSize: clamp(eraserSize, 20, 260) }),
-  clearEraser: () => set({ eraserStrokes: [] }),
+  brushStrokes: [],
+  setBrushStrokes: (brushStrokes) => set({ brushStrokes }),
+  brushSize: 90,
+  setBrushSize: (brushSize) => set({ brushSize: clamp(brushSize, 20, 260) }),
+  clearBrush: () => set({ brushStrokes: [] }),
 
   submitErase: () => {
-    const { eraserStrokes, eraserSize, face } = get();
-    if (eraserStrokes.length === 0) return;
+    const { brushStrokes, brushSize, face } = get();
+    if (brushStrokes.length === 0) return;
 
-    // The painted area is the path plus half a brush on every side.
-    const pad = eraserSize / 2;
-    const bounds = boundsOf(eraserStrokes.flat());
     const request: AnnotationRequest = {
       id: uid("erase"),
       face,
-      rect: {
-        x: bounds.x - pad,
-        y: bounds.y - pad,
-        width: bounds.width + eraserSize,
-        height: bounds.height + eraserSize,
-      },
-      strokes: eraserStrokes,
-      brushSize: eraserSize,
+      rect: paintedBounds(brushStrokes, brushSize),
+      strokes: brushStrokes,
+      brushSize,
       instruction: "",
       kind: "erase",
       status: "rendering",
@@ -935,7 +949,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set((s) => ({
       annotationRequests: [...s.annotationRequests, request],
-      eraserStrokes: [],
+      brushStrokes: [],
       canvasMode: "element",
       agentOpen: true,
     }));

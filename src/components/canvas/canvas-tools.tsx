@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Eraser, Lasso, Scan, SquareDashedMousePointer } from "lucide-react";
+import { Eraser, Highlighter, Scan, SquareDashedMousePointer } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { CanvasMode } from "@/lib/types";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -30,10 +30,10 @@ const MODES: Mode[] = [
     icon: SquareDashedMousePointer,
   },
   {
-    id: "wand",
-    label: "Magic Wand",
-    hint: "Draw around anything and say what to change",
-    icon: Lasso,
+    id: "highlighter",
+    label: "Magic Highlighter",
+    hint: "Paint over an area and say what to change",
+    icon: Highlighter,
   },
   {
     id: "eraser",

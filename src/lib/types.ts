@@ -126,7 +126,7 @@ export type AnnotationRect = {
 };
 
 /** What the pointer does on the canvas. */
-export type CanvasMode = "element" | "annotate" | "wand" | "eraser";
+export type CanvasMode = "element" | "annotate" | "highlighter" | "eraser";
 
 /**
  * A region the user marked out, plus what they want changed there. Boxed
@@ -138,11 +138,15 @@ export type AnnotationRequest = {
   face: FaceId;
   /** Bounding box of whatever was marked — drives labels and prompt placement. */
   rect: AnnotationRect;
-  /** Flat [x0, y0, …] in card coordinates. Present for freehand regions. */
+  /** Flat [x0, y0, …] in card coordinates. Present for a picked segment. */
   points?: number[];
   /** Set when the region came from clicking a segment rather than drawing one. */
   segmentLabel?: string;
-  /** Brush strokes, one flat point list each. Present for erase requests. */
+  /**
+   * Brush strokes, one flat point list each — the mask is the painted area,
+   * not an outline around it. Present for anything painted: an erase, or a
+   * highlighted region handed to the agent with an instruction.
+   */
   strokes?: number[][];
   brushSize?: number;
   /** Empty for an erase — removing something needs no instruction. */
