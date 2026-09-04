@@ -11,8 +11,12 @@ import {
   type ScheduleRow,
 } from "@/lib/invitation";
 import {
-  MAX_DETAILS,
+  DETAIL_TYPES,
+  MAX_PRINTED,
+  SEED_TYPES,
   findDetailType,
+  printedRows,
+  sortRows,
   type DetailRow,
 } from "@/lib/event-details";
 import { SWITCHER_INSET, TOOLBAR_INSET } from "@/lib/card-transform";
@@ -84,13 +88,6 @@ type EditorState = {
    */
   invitation: {
     orientation: Orientation;
-    eventName: string;
-    tagline: string;
-    hosts: string;
-    date: string;
-    time: string;
-    locationName: string;
-    address: string;
     /**
      * The dynamic detail list. Rows carry a type rather than a fixed label, so
      * a date gets a date picker and a dress code gets its options. The last row
@@ -315,18 +312,42 @@ function visit(visited: ToolId[], tool: ToolId | null): ToolId[] {
 }
 
 /**
- * The detail list always ends in one blank row, unless it is full — which is
- * what makes it grow as you fill it instead of needing an Add button.
+ * The detail list always ends in one blank row, unless the invitation is
+ * already carrying as much as it can print — which is what makes it grow as
+ * you fill it instead of needing an Add button.
+ *
+ * Typed rows sort into catalogue order, so a field put back after being
+ * removed returns to its place rather than the bottom of the invitation.
  */
 function withBlankRow(rows: DetailRow[]): DetailRow[] {
-  const filled = rows.filter((r) => r.type);
-  if (filled.length >= MAX_DETAILS) return filled;
-  const blanks = rows.filter((r) => !r.type);
-  return blanks.length === 1 ? rows : [...filled, blankRow()];
+  const typed = sortRows(rows.filter((r) => r.type));
+  if (printedRows(typed).length >= MAX_PRINTED) return typed;
+  return [...typed, blankRow()];
 }
 
 function blankRow(): DetailRow {
   return { id: uid("detail"), type: "", value: "", onInvitation: true };
+}
+
+/** The invitation the editor opens on, as rows. */
+function seedDetails(): DetailRow[] {
+  const values: Record<string, string> = {
+    eventName: "The Funeral for My Youth",
+    tagline: "Join us for the After Party",
+    hostNames: "Anuj Patel",
+    eventDate: "Saturday, November 13th, 2027",
+    eventTime: "9:00 PM",
+    venueName: "The Underground Bar",
+    venueAddress: "Brooklyn, NY",
+    dressCode: "Black tie",
+  };
+  const rows = SEED_TYPES.map((type) => ({
+    id: uid("detail"),
+    type,
+    value: values[type] ?? "",
+    onInvitation: DETAIL_TYPES.find((t) => t.type === type)?.onInvitation ?? true,
+  }));
+  return withBlankRow(rows);
 }
 
 /**
@@ -343,20 +364,6 @@ type Stash = {
   future: CardDoc[];
   visited: ToolId[];
 };
-
-/**
- * Fields that reach the artwork no matter what. The rest earn it: a detail
- * through its eye toggle, the RSVP lines by RSVPs being collected at all.
- */
-const PRINTED_FIELDS: (keyof EditorState["invitation"])[] = [
-  "eventName",
-  "tagline",
-  "hosts",
-  "date",
-  "time",
-  "locationName",
-  "address",
-];
 
 export const useEditorStore = create<EditorState>((set, get) => ({
   doc: cloneDoc(sampleCard),
@@ -416,17 +423,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   invitation: {
     orientation: "portrait",
-    eventName: "The Funeral for My Youth",
-    tagline: "Join us for the After Party",
-    hosts: "Anuj Patel",
-    date: "Saturday, November 13th, 2027",
-    time: "9:00 PM",
-    locationName: "The Underground Bar",
-    address: "Brooklyn, NY",
-    details: [
-      { id: "d_dress", type: "dressCode", value: "Black tie", onInvitation: true },
-      { id: "d_blank", type: "", value: "", onInvitation: true },
-    ],
+    details: seedDetails(),
     schedule: [],
     rsvpOn: true,
     rsvpMethod: "url",
@@ -442,11 +439,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   setInvitation: (patch) =>
     set((s) => {
+      // Every printed field is a row now, so the only things left here that
+      // reach the artwork are the RSVP lines — and only while responses are
+      // being collected at all.
       const touchesArt =
-        PRINTED_FIELDS.some((k) => k in patch) ||
-        // The RSVP lines are printed only while responses are being collected.
-        (("rsvpLine" in patch || "rsvpDeadline" in patch || "rsvpOn" in patch) &&
-          (patch.rsvpOn ?? s.invitation.rsvpOn));
+        ("rsvpLine" in patch || "rsvpDeadline" in patch || "rsvpOn" in patch) &&
+        (patch.rsvpOn ?? s.invitation.rsvpOn);
       return {
         invitation: {
           ...s.invitation,

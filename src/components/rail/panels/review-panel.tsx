@@ -20,7 +20,7 @@ import {
 } from "@/lib/fulfilment";
 import { findLanguage } from "@/lib/languages";
 import { findLongForm } from "@/lib/long-form";
-import { filledRows } from "@/lib/event-details";
+import { filledRows, printedRows, valueOfType } from "@/lib/event-details";
 import { priceOf } from "@/lib/pricing";
 import { useEditorStore, useNode } from "@/store/editor-store";
 import { useWarnings } from "@/lib/warnings";
@@ -47,7 +47,8 @@ export function ReviewPanel() {
   const invitation = useEditorStore((s) => s.invitation);
   // The list always carries a trailing blank row; it is not a detail yet.
   const detailRows = filledRows(invitation.details);
-  const printedCount = detailRows.filter((d) => d.onInvitation).length;
+  const printedCount = printedRows(invitation.details).length;
+  const detail = (type: string) => valueOfType(invitation.details, type);
 
   const message = useNode<TextNode>("inside_message");
   const signature = useNode<DrawNode>("inside_signature");
@@ -71,23 +72,26 @@ export function ReviewPanel() {
           key: "Art style",
           value: findStyle(styles[0] ?? null)?.label ?? "Not chosen",
         },
-        { step: "Create", key: "Event", value: invitation.eventName || "Unnamed" },
+        { step: "Create", key: "Event", value: detail("eventName") || "Unnamed" },
         {
           step: "Create",
           key: "When",
-          value: [invitation.date, invitation.time].filter(Boolean).join(" · ") || "Not set",
+          value:
+            [detail("eventDate"), detail("eventTime")].filter(Boolean).join(" · ") ||
+            "Not set",
         },
         {
           step: "Create",
           key: "Where",
           value:
-            [invitation.locationName, invitation.address].filter(Boolean).join(" · ") ||
-            "Not set",
+            [detail("venueName"), detail("venueAddress")]
+              .filter(Boolean)
+              .join(" · ") || "Not set",
         },
         {
           step: "Create",
           key: "On the artwork",
-          value: `${printedCount} of ${detailRows.length} extra detail${
+          value: `${printedCount} of ${detailRows.length} field${
             detailRows.length === 1 ? "" : "s"
           }`,
         },
