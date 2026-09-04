@@ -2,6 +2,19 @@
 
 import { create } from "zustand";
 import { defaultEnvelope, sampleCard } from "@/lib/sample-card";
+import {
+  DEFAULT_QR,
+  clampQr,
+  invitationDoc,
+  type QrShape,
+  type RsvpMethod,
+  type ScheduleRow,
+} from "@/lib/invitation";
+import {
+  MAX_DETAILS,
+  findDetailType,
+  type DetailRow,
+} from "@/lib/event-details";
 import { SWITCHER_INSET, TOOLBAR_INSET } from "@/lib/card-transform";
 import {
   defaultLongFormRect,
@@ -15,6 +28,8 @@ import {
   type Scene,
 } from "@/lib/digital-card";
 import type {
+  Orientation,
+  Product,
   AnnotationRect,
   AnnotationRequest,
   CanvasMode,
@@ -28,14 +43,14 @@ import type {
   FaceId,
   ToolId,
 } from "@/lib/types";
-import { boundsOf } from "@/lib/lasso";
+import { boundsOf, paintedBounds } from "@/lib/lasso";
 import { STEP_DEFAULT_TOOL, stepTools } from "@/lib/steps";
 import type {
   DigitalDelivery,
   PrintedDelivery,
   Recipient,
 } from "@/lib/fulfilment";
-import { CARD_TYPES } from "@/lib/pricing";
+import { ENVELOPE_ADD_ON, priceOf, unitPrice } from "@/lib/pricing";
 import { clamp, uid } from "@/lib/utils";
 
 const MAX_HISTORY = 50;
@@ -54,6 +69,63 @@ type EditorState = {
   doc: CardDoc;
   face: FaceId;
   activeTool: ToolId | null;
+
+  /**
+   * Greeting cards or invitations. Each product keeps its own document and
+   * history, so switching lines never costs you the work on the other.
+   */
+  product: Product;
+  setProduct: (product: Product) => void;
+
+  /**
+   * Invitations carry structured event data rather than a written message.
+   * The image model bakes it into the back panel, which is why changing a
+   * printed field leaves the render behind the data rather than editing it.
+   */
+  invitation: {
+    orientation: Orientation;
+    eventName: string;
+    tagline: string;
+    hosts: string;
+    date: string;
+    time: string;
+    locationName: string;
+    address: string;
+    /**
+     * The dynamic detail list. Rows carry a type rather than a fixed label, so
+     * a date gets a date picker and a dress code gets its options. The last row
+     * is always blank, which is what lets the list grow without an Add button.
+     */
+    details: DetailRow[];
+    schedule: ScheduleRow[];
+    rsvpOn: boolean;
+    rsvpMethod: RsvpMethod;
+    rsvpValue: string;
+    rsvpDeadline: string;
+    rsvpLine: string;
+    qrOn: boolean;
+    qrShape: QrShape;
+    /** Fractions of the panel, so the code survives an orientation change. */
+    qr: { x: number; y: number; width: number };
+    /** The artwork is behind the data and needs a new render. */
+    stale: boolean;
+    rendering: boolean;
+  };
+  /**
+   * Patching event data. Anything that reaches the artwork leaves the render
+   * stale; the QR is composited by the editor afterwards, so moving it never
+   * does.
+   */
+  setInvitation: (patch: Partial<EditorState["invitation"]>) => void;
+  setOrientation: (orientation: Orientation) => void;
+  /** Give a blank row a type, or change one — which resets what it holds. */
+  setDetailType: (id: string, type: string) => void;
+  updateDetail: (id: string, patch: Partial<DetailRow>) => void;
+  removeDetail: (id: string) => void;
+  setSchedule: (rows: ScheduleRow[]) => void;
+  moveQr: (pos: { x: number; y: number }, width?: number) => void;
+  /** Hand the details back to the model and wait for new artwork. */
+  renderInvitation: () => void;
 
   /** Create → Personalize → Finish. The rail regroups per step. */
   step: Step;
@@ -105,6 +177,12 @@ type EditorState = {
   addRecipient: () => void;
   updateRecipient: (id: string, patch: Partial<Recipient>) => void;
   removeRecipient: (id: string) => void;
+  /**
+   * Envelopes come with a greeting card. On printed invitations they are an
+   * add-on, priced per copy.
+   */
+  envelopeAddOn: boolean;
+  setEnvelopeAddOn: (value: boolean) => void;
   /** Both renditions can end up in the same order. */
   alsoInCart: boolean;
   setAlsoInCart: (value: boolean) => void;
@@ -112,6 +190,15 @@ type EditorState = {
   setReveal: (patch: Partial<EditorState["digital"]["reveal"]>) => void;
   setCover: (patch: Partial<EditorState["digital"]["cover"]>) => void;
   toggleRevealStep: (id: string) => void;
+  /**
+   * Sections of the guided steps that have been opened. Personalize and Finish
+   * are walked front to back, so the rail needs to show what has been passed
+   * and what is still ahead.
+   */
+  visited: ToolId[];
+  /** Move to a section, crossing into another step if that is where it is. */
+  goTo: (step: Step, tool: ToolId | null) => void;
+
   /** Flyout stays mounted but collapses when the rail is pinned closed. */
   railPinned: boolean;
   zoom: number;
@@ -173,12 +260,16 @@ type EditorState = {
   submitAnnotation: (instruction: string) => void;
   resolveAnnotation: (id: string) => void;
 
-  /** Magic eraser: paint over what should go, no instruction needed. */
-  eraserStrokes: number[][];
-  setEraserStrokes: (strokes: number[][]) => void;
-  eraserSize: number;
-  setEraserSize: (size: number) => void;
-  clearEraser: () => void;
+  /**
+   * One brush, two tools. The highlighter paints the area it wants changed and
+   * the eraser paints the area it wants gone — the mask is what the brush
+   * covered, which is easier to aim than tracing an outline around it.
+   */
+  brushStrokes: number[][];
+  setBrushStrokes: (strokes: number[][]) => void;
+  brushSize: number;
+  setBrushSize: (size: number) => void;
+  clearBrush: () => void;
   submitErase: () => void;
 
   /** Translations: pick a target language, agent re-renders every face. */
@@ -217,25 +308,280 @@ function cloneDoc(doc: CardDoc): CardDoc {
   return structuredClone(doc);
 }
 
+/** Records a section as passed. Opening it is the visit; nothing is required. */
+function visit(visited: ToolId[], tool: ToolId | null): ToolId[] {
+  if (!tool || visited.includes(tool)) return visited;
+  return [...visited, tool];
+}
+
+/**
+ * The detail list always ends in one blank row, unless it is full — which is
+ * what makes it grow as you fill it instead of needing an Add button.
+ */
+function withBlankRow(rows: DetailRow[]): DetailRow[] {
+  const filled = rows.filter((r) => r.type);
+  if (filled.length >= MAX_DETAILS) return filled;
+  const blanks = rows.filter((r) => !r.type);
+  return blanks.length === 1 ? rows : [...filled, blankRow()];
+}
+
+function blankRow(): DetailRow {
+  return { id: uid("detail"), type: "", value: "", onInvitation: true };
+}
+
+/**
+ * Kept outside the store: parking the other product's document is bookkeeping,
+ * not state anything renders from.
+ */
+const stash: Record<Product, Stash | null> = { card: null, invitation: null };
+
+/** A product's work, parked while the other line is open. */
+type Stash = {
+  doc: CardDoc;
+  face: FaceId;
+  past: CardDoc[];
+  future: CardDoc[];
+  visited: ToolId[];
+};
+
+/**
+ * Fields that reach the artwork no matter what. The rest earn it: a detail
+ * through its eye toggle, the RSVP lines by RSVPs being collected at all.
+ */
+const PRINTED_FIELDS: (keyof EditorState["invitation"])[] = [
+  "eventName",
+  "tagline",
+  "hosts",
+  "date",
+  "time",
+  "locationName",
+  "address",
+];
+
 export const useEditorStore = create<EditorState>((set, get) => ({
   doc: cloneDoc(sampleCard),
   face: "front",
   activeTool: null,
+
+  product: "card",
+  setProduct: (product) => {
+    const state = get();
+    if (product === state.product) return;
+
+    const parked: Stash = {
+      doc: state.doc,
+      face: state.face,
+      past: state.past,
+      future: state.future,
+      visited: state.visited,
+    };
+    const resumed =
+      stash[product] ??
+      ({
+        doc:
+          product === "invitation"
+            ? invitationDoc(state.invitation.orientation)
+            : cloneDoc(sampleCard),
+        face: "front",
+        past: [],
+        future: [],
+        visited: [],
+      } satisfies Stash);
+    stash[state.product] = parked;
+    stash[product] = null;
+
+    // The rail differs per product, so a panel the other line does not have
+    // has to give way to whatever this step opens on.
+    const tool = state.activeTool;
+    const keeps =
+      tool !== null && stepTools(state.step, state.cardType, product).includes(tool);
+
+    set({
+      product,
+      doc: resumed.doc,
+      face: resumed.face,
+      past: resumed.past,
+      future: resumed.future,
+      visited: visit(resumed.visited, keeps ? tool : STEP_DEFAULT_TOOL[state.step]),
+      activeTool: keeps ? tool : STEP_DEFAULT_TOOL[state.step],
+      surface: "card",
+      canvasMode: "element",
+      draftAnnotation: null,
+      draftLasso: null,
+      brushStrokes: [],
+      zoomTouched: false,
+    });
+    get().maybeFit();
+  },
+
+  invitation: {
+    orientation: "portrait",
+    eventName: "The Funeral for My Youth",
+    tagline: "Join us for the After Party",
+    hosts: "Anuj Patel",
+    date: "Saturday, November 13th, 2027",
+    time: "9:00 PM",
+    locationName: "The Underground Bar",
+    address: "Brooklyn, NY",
+    details: [
+      { id: "d_dress", type: "dressCode", value: "Black tie", onInvitation: true },
+      { id: "d_blank", type: "", value: "", onInvitation: true },
+    ],
+    schedule: [],
+    rsvpOn: true,
+    rsvpMethod: "url",
+    rsvpValue: "hstmp.co/funeral-youth",
+    rsvpDeadline: "November 1st, 2027",
+    rsvpLine: "RSVP before I get old",
+    qrOn: true,
+    qrShape: "rounded",
+    qr: { ...DEFAULT_QR },
+    stale: false,
+    rendering: false,
+  },
+
+  setInvitation: (patch) =>
+    set((s) => {
+      const touchesArt =
+        PRINTED_FIELDS.some((k) => k in patch) ||
+        // The RSVP lines are printed only while responses are being collected.
+        (("rsvpLine" in patch || "rsvpDeadline" in patch || "rsvpOn" in patch) &&
+          (patch.rsvpOn ?? s.invitation.rsvpOn));
+      return {
+        invitation: {
+          ...s.invitation,
+          ...patch,
+          stale: s.invitation.stale || touchesArt,
+        },
+      };
+    }),
+
+  setOrientation: (orientation) =>
+    set((s) => {
+      if (orientation === s.invitation.orientation) return {};
+      return {
+        // Orientation is a property of the product, not a view of it: the trim
+        // changes, so the document is rebuilt around the new one.
+        doc:
+          s.product === "invitation"
+            ? cloneDoc(invitationDoc(orientation))
+            : s.doc,
+        invitation: { ...s.invitation, orientation, stale: true },
+        zoomTouched: false,
+      };
+    }),
+
+  // Choosing a type is what turns the trailing blank row into a real one, so
+  // this is also where the next blank row comes from.
+  setDetailType: (id, type) =>
+    set((s) => {
+      const definition = findDetailType(type);
+      const details = s.invitation.details.map((d) =>
+        d.id === id
+          ? {
+              id: d.id,
+              type,
+              value: "",
+              customLabel: undefined,
+              // Each type knows whether it usually belongs in print.
+              onInvitation: definition?.onInvitation ?? true,
+            }
+          : d,
+      );
+      return {
+        invitation: { ...s.invitation, details: withBlankRow(details) },
+      };
+    }),
+
+  updateDetail: (id, patch) =>
+    set((s) => {
+      const before = s.invitation.details.find((d) => d.id === id);
+      const details = s.invitation.details.map((d) =>
+        d.id === id ? { ...d, ...patch } : d,
+      );
+      // Editing a hidden row is bookkeeping; showing or hiding one, or editing
+      // a shown one, changes what gets printed.
+      const touchesArt =
+        !!before &&
+        (before.onInvitation ||
+          ("onInvitation" in patch && patch.onInvitation !== before.onInvitation));
+      return {
+        invitation: {
+          ...s.invitation,
+          details: withBlankRow(details),
+          stale: s.invitation.stale || touchesArt,
+        },
+      };
+    }),
+
+  removeDetail: (id) =>
+    set((s) => {
+      const gone = s.invitation.details.find((d) => d.id === id);
+      return {
+        invitation: {
+          ...s.invitation,
+          details: withBlankRow(
+            s.invitation.details.filter((d) => d.id !== id),
+          ),
+          stale:
+            s.invitation.stale || (!!gone?.onInvitation && !!gone.value.trim()),
+        },
+      };
+    }),
+
+  setSchedule: (schedule) =>
+    set((s) => {
+      const shown = s.invitation.details.some(
+        (d) => d.type === "eventSchedule" && d.onInvitation,
+      );
+      return {
+        invitation: {
+          ...s.invitation,
+          schedule,
+          stale: s.invitation.stale || shown,
+        },
+      };
+    }),
+
+  // The code is composited onto the finished artwork by the editor, so moving
+  // or resizing it never asks the model for anything.
+  moveQr: (pos, width) =>
+    set((s) => {
+      const w = width ?? s.invitation.qr.width;
+      return { invitation: { ...s.invitation, qr: { ...clampQr(pos, w), width: w } } };
+    }),
+
+  renderInvitation: () => {
+    if (get().invitation.rendering) return;
+    set((s) => ({ invitation: { ...s.invitation, rendering: true } }));
+    // Stub: the real agent re-renders the back panel from invitationDetails.
+    window.setTimeout(() => {
+      set((s) => ({
+        invitation: { ...s.invitation, rendering: false, stale: false },
+      }));
+      // The change is on the back, so that is what there is to look at.
+      if (get().product === "invitation") get().setFace("back");
+    }, 1800);
+  },
 
   step: 1,
   setStep: (step) => {
     // Panels belong to a step. Keep whatever is open if it lives in the step
     // being opened; otherwise lead with that step's first decision.
     const tool = get().activeTool;
-    const keeps = tool !== null && stepTools(step, get().cardType).includes(tool);
+    const keeps =
+      tool !== null &&
+      stepTools(step, get().cardType, get().product).includes(tool);
+    const opened = keeps ? tool : STEP_DEFAULT_TOOL[step];
     set({
       step,
-      activeTool: keeps ? tool : STEP_DEFAULT_TOOL[step],
+      activeTool: opened,
+      visited: visit(get().visited, opened),
       agentOpen: step !== 3,
       canvasMode: "element",
       draftAnnotation: null,
       draftLasso: null,
-      eraserStrokes: [],
+      brushStrokes: [],
     });
   },
   cardType: "printed",
@@ -244,10 +590,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     // has to close rather than linger.
     const { step, activeTool } = get();
     const keeps =
-      activeTool !== null && stepTools(step, cardType).includes(activeTool);
+      activeTool !== null &&
+      stepTools(step, cardType, get().product).includes(activeTool);
     set({
       cardType,
       activeTool: keeps ? activeTool : "cardtype",
+      // The rendition decides which sections exist, so a switch changes what
+      // is still ahead — but what has been passed stays passed.
+      visited: visit(get().visited, keeps ? activeTool : "cardtype"),
       surface: "card",
     });
   },
@@ -333,15 +683,21 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     })),
   alsoInCart: false,
   setAlsoInCart: (alsoInCart) => set({ alsoInCart }),
+  envelopeAddOn: true,
+  setEnvelopeAddOn: (envelopeAddOn) => set({ envelopeAddOn }),
 
   // Digital is priced per recipient because each one gets their own link;
-  // print is priced per copy.
+  // print is priced per copy, and invitations earn a quantity break because
+  // they are bought by the guest list rather than one at a time.
   orderTotal: () => {
-    const { cardType, fulfilment, alsoInCart } = get();
-    const unit = (id: "digital" | "printed") =>
-      CARD_TYPES.find((t) => t.id === id)!.unit;
-    const digitalSum = unit("digital") * fulfilment.recipients.length;
-    const printedSum = unit("printed") * fulfilment.quantity;
+    const { cardType, fulfilment, alsoInCart, product, envelopeAddOn } = get();
+    const { quantity, recipients } = fulfilment;
+    const digitalSum = priceOf("digital", product).unit * recipients.length;
+    const printedSum =
+      unitPrice(product, "printed", quantity) * quantity +
+      (product === "invitation" && envelopeAddOn
+        ? ENVELOPE_ADD_ON * quantity
+        : 0);
     const primary = cardType === "digital" ? digitalSum : printedSum;
     const extra = alsoInCart
       ? cardType === "digital"
@@ -377,9 +733,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ face, draftAnnotation: null, draftLasso: null, hoverSegment: null });
     get().maybeFit();
   },
-  setTool: (activeTool) => set({ activeTool }),
+  visited: [],
+  goTo: (step, tool) =>
+    set((s) => ({
+      step,
+      activeTool: tool,
+      visited: visit(s.visited, tool),
+      surface: "card",
+      canvasMode: "element",
+      draftAnnotation: null,
+      draftLasso: null,
+      brushStrokes: [],
+    })),
+
+  setTool: (activeTool) =>
+    set((s) => ({ activeTool, visited: visit(s.visited, activeTool) })),
   toggleTool: (tool) =>
-    set((s) => ({ activeTool: s.activeTool === tool ? null : tool })),
+    set((s) => {
+      const activeTool = s.activeTool === tool ? null : tool;
+      return { activeTool, visited: visit(s.visited, activeTool) };
+    }),
   setRailPinned: (railPinned) => set({ railPinned }),
 
   setZoom: (zoom) => set({ zoom: clamp(zoom, 0.1, 4), zoomTouched: true }),
@@ -485,7 +858,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       draftAnnotation: null,
       draftLasso: null,
       draftSegmentLabel: null,
-      eraserStrokes: [],
+      brushStrokes: [],
       hoverSegment: null,
     }),
 
@@ -507,14 +880,31 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   annotationRequests: [],
   submitAnnotation: (instruction) => {
-    const { draftAnnotation, draftLasso, draftSegmentLabel, face } = get();
-    if (!draftAnnotation || !instruction.trim()) return;
+    const {
+      canvasMode,
+      draftAnnotation,
+      draftLasso,
+      draftSegmentLabel,
+      brushStrokes,
+      brushSize,
+      face,
+    } = get();
+    // A highlighted region is defined by paint; a boxed or picked one by a
+    // rectangle or an outline. Either way the agent gets one region and one
+    // instruction.
+    const painted = canvasMode === "highlighter" && brushStrokes.length > 0;
+    const rect = painted
+      ? paintedBounds(brushStrokes, brushSize)
+      : draftAnnotation;
+    if (!rect || !instruction.trim()) return;
 
     const request: AnnotationRequest = {
       id: uid("ann"),
       face,
-      rect: draftAnnotation,
-      points: draftLasso ?? undefined,
+      rect,
+      points: painted ? undefined : (draftLasso ?? undefined),
+      strokes: painted ? brushStrokes : undefined,
+      brushSize: painted ? brushSize : undefined,
       segmentLabel: draftSegmentLabel ?? undefined,
       instruction: instruction.trim(),
       kind: "edit",
@@ -526,6 +916,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       draftAnnotation: null,
       draftLasso: null,
       draftSegmentLabel: null,
+      brushStrokes: [],
       canvasMode: "element",
       agentOpen: true,
     }));
@@ -535,30 +926,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     setTimeout(() => get().resolveAnnotation(request.id), 2400);
   },
 
-  eraserStrokes: [],
-  setEraserStrokes: (eraserStrokes) => set({ eraserStrokes }),
-  eraserSize: 90,
-  setEraserSize: (eraserSize) => set({ eraserSize: clamp(eraserSize, 20, 260) }),
-  clearEraser: () => set({ eraserStrokes: [] }),
+  brushStrokes: [],
+  setBrushStrokes: (brushStrokes) => set({ brushStrokes }),
+  brushSize: 90,
+  setBrushSize: (brushSize) => set({ brushSize: clamp(brushSize, 20, 260) }),
+  clearBrush: () => set({ brushStrokes: [] }),
 
   submitErase: () => {
-    const { eraserStrokes, eraserSize, face } = get();
-    if (eraserStrokes.length === 0) return;
+    const { brushStrokes, brushSize, face } = get();
+    if (brushStrokes.length === 0) return;
 
-    // The painted area is the path plus half a brush on every side.
-    const pad = eraserSize / 2;
-    const bounds = boundsOf(eraserStrokes.flat());
     const request: AnnotationRequest = {
       id: uid("erase"),
       face,
-      rect: {
-        x: bounds.x - pad,
-        y: bounds.y - pad,
-        width: bounds.width + eraserSize,
-        height: bounds.height + eraserSize,
-      },
-      strokes: eraserStrokes,
-      brushSize: eraserSize,
+      rect: paintedBounds(brushStrokes, brushSize),
+      strokes: brushStrokes,
+      brushSize,
       instruction: "",
       kind: "erase",
       status: "rendering",
@@ -566,7 +949,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
     set((s) => ({
       annotationRequests: [...s.annotationRequests, request],
-      eraserStrokes: [],
+      brushStrokes: [],
       canvasMode: "element",
       agentOpen: true,
     }));

@@ -2,6 +2,7 @@ export type FaceId = "front" | "inside" | "back";
 
 export type ToolId =
   | "styles"
+  | "event"
   | "message"
   | "signature"
   | "translations"
@@ -18,6 +19,16 @@ export type ToolId =
 
 /** The canvas shows one of these at a time. */
 export type Surface = "card" | "envelope";
+
+/**
+ * Two product lines. A greeting card is three faces around a fold and carries
+ * a written message; an invitation is two panels carrying structured event
+ * data that the image model bakes into the back.
+ */
+export type Product = "card" | "invitation";
+
+/** Invitations ship in both, and orientation reaches the whole stack. */
+export type Orientation = "portrait" | "landscape";
 
 export type Step = 1 | 2 | 3;
 
@@ -58,6 +69,14 @@ export type ImageNode = BaseNode & {
   scaleY: number;
   /** Placeholder label shown when we're not rendering a real asset. */
   label?: string;
+  /**
+   * How the bitmap meets its frame. "cover" centre-crops to fill without
+   * distorting — what a print pipeline does with bleed, and what lets one
+   * portrait render sit on a landscape trim.
+   */
+  fit?: "stretch" | "cover";
+  /** Rounding applied to the drawn bitmap, in card pixels. */
+  cornerRadius?: number;
 };
 
 export type ShapeNode = BaseNode & {
@@ -107,7 +126,7 @@ export type AnnotationRect = {
 };
 
 /** What the pointer does on the canvas. */
-export type CanvasMode = "element" | "annotate" | "wand" | "eraser";
+export type CanvasMode = "element" | "annotate" | "highlighter" | "eraser";
 
 /**
  * A region the user marked out, plus what they want changed there. Boxed
@@ -119,11 +138,15 @@ export type AnnotationRequest = {
   face: FaceId;
   /** Bounding box of whatever was marked — drives labels and prompt placement. */
   rect: AnnotationRect;
-  /** Flat [x0, y0, …] in card coordinates. Present for freehand regions. */
+  /** Flat [x0, y0, …] in card coordinates. Present for a picked segment. */
   points?: number[];
   /** Set when the region came from clicking a segment rather than drawing one. */
   segmentLabel?: string;
-  /** Brush strokes, one flat point list each. Present for erase requests. */
+  /**
+   * Brush strokes, one flat point list each — the mask is the painted area,
+   * not an outline around it. Present for anything painted: an erase, or a
+   * highlighted region handed to the agent with an instruction.
+   */
   strokes?: number[][];
   brushSize?: number;
   /** Empty for an erase — removing something needs no instruction. */

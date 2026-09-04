@@ -1,4 +1,4 @@
-import type { CardType } from "./types";
+import type { CardType, Product } from "./types";
 
 /** How a digital card reaches someone. */
 export const DIGITAL_DELIVERY = [
@@ -13,11 +13,28 @@ export const DIGITAL_DELIVERY = [
     note: "We send it, with your name on it",
   },
   {
+    id: "sms",
+    label: "Send by text",
+    note: "Straight to their phone, with the RSVP link attached",
+  },
+  {
     id: "video",
     label: "Share a video",
     note: "The whole reveal as a clip — renders after checkout",
   },
 ] as const;
+
+/**
+ * Invitations go out to a guest list, so they reach people directly rather
+ * than as something to pass along; a video of the reveal is a card idea.
+ */
+const INVITATION_DIGITAL: DigitalDelivery[] = ["email", "sms", "link"];
+
+export function digitalDeliveryFor(product: Product) {
+  return product === "invitation"
+    ? INVITATION_DIGITAL.map((id) => DIGITAL_DELIVERY.find((d) => d.id === id)!)
+    : DIGITAL_DELIVERY.filter((d) => d.id !== "sms");
+}
 
 /** How a printed card reaches someone. */
 export const PRINTED_DELIVERY = [

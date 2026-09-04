@@ -3,10 +3,12 @@
 import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
-import { TOOLS } from "@/components/rail/tools";
+import { TOOLS, toolLabel } from "@/components/rail/tools";
+import { FlowNav } from "@/components/rail/flow-nav";
 import { BackgroundPanel } from "@/components/rail/panels/background-panel";
 import { CardTypePanel } from "@/components/rail/panels/card-type-panel";
 import { DeliveryPanel } from "@/components/rail/panels/delivery-panel";
+import { EventPanel } from "@/components/rail/panels/event-panel";
 import { PrintOptionsPanel } from "@/components/rail/panels/print-options-panel";
 import { RecipientsPanel } from "@/components/rail/panels/recipients-panel";
 import { CoverPanel } from "@/components/rail/panels/cover-panel";
@@ -25,6 +27,7 @@ import { useEditorStore } from "@/store/editor-store";
 
 const PANELS: Record<ToolId, React.ComponentType> = {
   styles: StylesPanel,
+  event: EventPanel,
   message: MessagePanel,
   signature: SignaturePanel,
   translations: TranslationsPanel,
@@ -52,7 +55,9 @@ const PANELS: Record<ToolId, React.ComponentType> = {
 export function Flyout() {
   const activeTool = useEditorStore((s) => s.activeTool);
   const setTool = useEditorStore((s) => s.setTool);
+  const product = useEditorStore((s) => s.product);
   const tool = TOOLS.find((t) => t.id === activeTool);
+  const label = tool ? toolLabel(tool, product) : "";
   const Panel = tool ? PANELS[tool.id] : null;
 
   return (
@@ -72,10 +77,10 @@ export function Flyout() {
           >
             <header className="flex shrink-0 items-center justify-between gap-3 border-b border-hairline px-5 py-4">
               <h2 className="font-display text-[19px] font-semibold leading-tight text-ink">
-                {tool.label}
+                {label}
               </h2>
               <IconButton
-                aria-label={`Close ${tool.label}`}
+                aria-label={`Close ${label}`}
                 onClick={() => setTool(null)}
                 className="-mr-1 shrink-0"
               >
@@ -85,6 +90,8 @@ export function Flyout() {
 
             {/* Keyed so each tool's panel remounts with its own entrance stagger. */}
             <Panel key={tool.id} />
+
+            <FlowNav />
           </aside>
         </motion.div>
       )}

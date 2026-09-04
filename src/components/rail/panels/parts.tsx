@@ -176,6 +176,10 @@ export type SelectOption = {
   /** Optional preview rendered in the sample font. */
   sample?: string;
   fontFamily?: string;
+  /** Offered but not choosable — a detail type already used, say. */
+  disabled?: boolean;
+  /** Heading this option sits under. Options are shown in list order. */
+  group?: string;
 };
 
 export function Select({
@@ -183,11 +187,14 @@ export function Select({
   value,
   onChange,
   className,
+  placeholder,
 }: {
   options: SelectOption[];
   value: string;
   onChange: (value: string) => void;
   className?: string;
+  /** Shown when nothing is chosen yet. */
+  placeholder?: string;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -216,7 +223,14 @@ export function Select({
         transition={springTight}
         className="flex w-full items-center gap-2 rounded-full border border-hairline bg-surface px-4 py-2.5 text-left text-[14px] text-ink hover:border-hairline-strong"
       >
-        <span className="truncate font-medium">{current?.label}</span>
+        <span
+          className={cn(
+            "truncate font-medium",
+            !current && "font-normal text-ink-faint",
+          )}
+        >
+          {current?.label ?? placeholder}
+        </span>
         {current?.sample && (
           <span
             className="truncate text-ink-faint"
@@ -244,19 +258,30 @@ export function Select({
             style={{ transformOrigin: "top center" }}
             className="scroll-slim absolute left-0 right-0 top-[calc(100%+6px)] z-30 max-h-64 overflow-y-auto rounded-[16px] border border-hairline bg-surface p-1.5 shadow-pop"
           >
-            {options.map((option) => (
+            {options.map((option, i) => (
               <li key={option.value}>
+                {option.group && option.group !== options[i - 1]?.group && (
+                  <p className="px-3 pb-1 pt-2.5 text-[10.5px] font-semibold uppercase tracking-[0.07em] text-ink-faint">
+                    {option.group}
+                  </p>
+                )}
                 <motion.button
                   type="button"
+                  disabled={option.disabled}
                   onClick={() => {
                     onChange(option.value);
                     setOpen(false);
                   }}
-                  whileHover={{ x: 3 }}
+                  whileHover={option.disabled ? undefined : { x: 3 }}
                   transition={springTight}
                   className={cn(
-                    "flex w-full items-center gap-2 rounded-[11px] px-3 py-2 text-left text-[14px] hover:bg-surface-sunken",
-                    option.value === value ? "text-ink" : "text-ink-soft",
+                    "flex w-full items-center gap-2 rounded-[11px] px-3 py-2 text-left text-[14px]",
+                    option.disabled
+                      ? "cursor-default text-ink-faint"
+                      : cn(
+                          "hover:bg-surface-sunken",
+                          option.value === value ? "text-ink" : "text-ink-soft",
+                        ),
                   )}
                 >
                   <span className="truncate font-medium">{option.label}</span>
@@ -268,7 +293,12 @@ export function Select({
                       {option.sample}
                     </span>
                   )}
-                  {option.value === value && (
+                  {option.disabled && (
+                    <span className="ml-auto shrink-0 text-[10.5px] uppercase tracking-[0.06em]">
+                      Added
+                    </span>
+                  )}
+                  {!option.disabled && option.value === value && (
                     <Check size={15} className="ml-auto shrink-0 text-brand-red" />
                   )}
                 </motion.button>

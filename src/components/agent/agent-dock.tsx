@@ -18,17 +18,38 @@ import { useState } from "react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { springBouncy, springHeavy, staggerChild } from "@/lib/motion";
-import type { AnnotationRequest } from "@/lib/types";
+import type { AnnotationRequest, Product } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
 
-const SUGGESTIONS = [
-  "Add the graduate's name to the front",
-  "Include the university name on the diploma",
-  "Add a personal congratulatory message inside",
-  "Change the comic book text colors",
-  "Upload a photo of the graduate jumping",
-  "Add the graduation year to the speech bubble",
-];
+/**
+ * What the agent offers depends on what is on the canvas. An invitation's
+ * words come from the Event panel, so the agent is asked about art direction
+ * and layout rather than about the copy.
+ */
+const SUGGESTIONS: Record<Product, string[]> = {
+  card: [
+    "Add the graduate's name to the front",
+    "Include the university name on the diploma",
+    "Add a personal congratulatory message inside",
+    "Change the comic book text colors",
+    "Upload a photo of the graduate jumping",
+    "Add the graduation year to the speech bubble",
+  ],
+  invitation: [
+    "Make the back panel easier to read at arm's length",
+    "Give the details block more room to breathe",
+    "Try a landscape layout for the same artwork",
+    "Swap the party hat for something less literal",
+    "Warm the neon up a little",
+    "Put the RSVP line on its own line",
+  ],
+};
+
+const GREETING: Record<Product, string> = {
+  card: "How would you like to customise this bold and heroic graduation card?",
+  invitation:
+    "How would you like to customise this invitation? The event details come from the Event panel — I handle everything else.",
+};
 
 const OPEN_WIDTH = 380;
 const COLLAPSED_WIDTH = 68;
@@ -42,6 +63,7 @@ export function AgentDock() {
   const open = useEditorStore((s) => s.agentOpen);
   const setOpen = useEditorStore((s) => s.setAgentOpen);
   const requests = useEditorStore((s) => s.annotationRequests);
+  const product = useEditorStore((s) => s.product);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [draft, setDraft] = useState("");
 
@@ -82,8 +104,7 @@ export function AgentDock() {
             >
               <AgentAvatar />
               <p className="pt-0.5 text-[14px] leading-snug text-ink">
-                How would you like to customise this bold and heroic graduation
-                card?
+                {GREETING[product]}
               </p>
             </motion.div>
 
@@ -122,7 +143,7 @@ export function AgentDock() {
                   }}
                   className="space-y-0.5"
                 >
-                  {SUGGESTIONS.map((s, i) => (
+                  {SUGGESTIONS[product].map((s, i) => (
                     <motion.li key={s} variants={staggerChild}>
                       <motion.button
                         type="button"

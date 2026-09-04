@@ -3,12 +3,14 @@
 import { AnimatePresence, motion } from "motion/react";
 import dynamic from "next/dynamic";
 import { useEffect, useRef, useState } from "react";
-import { EraserLayer } from "@/components/canvas/eraser-layer";
+import { BrushLayer } from "@/components/canvas/brush-layer";
 import { RegionLayer } from "@/components/canvas/region-layer";
 import { CanvasTools } from "@/components/canvas/canvas-tools";
 import { EnvelopePreview } from "@/components/canvas/envelope-preview";
 import { SceneLayer } from "@/components/canvas/scene-layer";
 import { PlacementLayers } from "@/components/canvas/placement-layers";
+import { QrLayer } from "@/components/canvas/qr-layer";
+import { RenderPill } from "@/components/canvas/render-pill";
 import { FaceSwitcher } from "@/components/canvas/face-switcher";
 import { springHeavy } from "@/lib/motion";
 import { useEditorStore } from "@/store/editor-store";
@@ -21,6 +23,7 @@ export function CanvasArea() {
   const hostRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
   const face = useEditorStore((s) => s.face);
+  const canvasMode = useEditorStore((s) => s.canvasMode);
   // The face switcher decides what the canvas shows; the envelope is a face of
   // the digital card, not a takeover.
   const showEnvelope = useEditorStore((s) => s.surface === "envelope");
@@ -31,6 +34,18 @@ export function CanvasArea() {
   const setViewport = useEditorStore((s) => s.setViewport);
   // Finish is checkout — nothing on the card is editable from there.
   const editing = useEditorStore((s) => s.step !== 3);
+  // The code is grabbable while the panel that owns it is open, and only on
+  // the panel it is printed on.
+  const showQrHandles = useEditorStore(
+    (s) =>
+      s.product === "invitation" &&
+      s.activeTool === "event" &&
+      s.invitation.qrOn &&
+      s.invitation.rsvpOn &&
+      s.surface === "card" &&
+      s.face === "back" &&
+      s.canvasMode === "element",
+  );
 
   useEffect(() => {
     const host = hostRef.current;
@@ -76,9 +91,17 @@ export function CanvasArea() {
         {/* Placement boxes for whichever panel owns a placeable piece. */}
         {!showEnvelope && size.width > 0 && <PlacementLayers viewport={size} />}
 
+        {showQrHandles && size.width > 0 && <QrLayer viewport={size} />}
+
+        <RenderPill />
+
         {/* Marking up regions is a card operation — no meaning on the envelope. */}
         {!showEnvelope && size.width > 0 && <RegionLayer viewport={size} />}
-        {!showEnvelope && size.width > 0 && <EraserLayer viewport={size} />}
+        {/* Keyed by mode so switching brushes starts clean rather than
+            carrying the last instruction across. */}
+        {!showEnvelope && size.width > 0 && (
+          <BrushLayer key={canvasMode} viewport={size} />
+        )}
       </div>
 
       <AnimatePresence>

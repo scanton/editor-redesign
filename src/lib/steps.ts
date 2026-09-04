@@ -1,4 +1,4 @@
-import type { CardType, Step, ToolId } from "./types";
+import type { CardType, Product, Step, ToolId } from "./types";
 
 /**
  * The job has three parts: make the card, dress how it is sent, then send it.
@@ -12,12 +12,24 @@ export const STEPS: { id: Step; label: string; note: string }[] = [
 ];
 
 /**
- * Panels available in each step. Card type forks the Personalize rail: a print
- * only needs the mailer, while a digital card has a scene, a reveal and a cover.
+ * Panels available in each step, forked twice over.
+ *
+ * The product decides what Create holds: a greeting card is written and signed,
+ * while an invitation carries event data instead — there is no inside to sign,
+ * and its words come from the details rather than a message.
+ *
+ * The rendition then forks Personalize: a print only needs the mailer, while a
+ * digital one has a scene, a reveal and a cover.
  */
-export function stepTools(step: Step, cardType: CardType): ToolId[] {
+export function stepTools(
+  step: Step,
+  cardType: CardType,
+  product: Product = "card",
+): ToolId[] {
   if (step === 1)
-    return ["styles", "message", "longform", "signature", "translations"];
+    return product === "invitation"
+      ? ["styles", "event", "translations"]
+      : ["styles", "message", "longform", "signature", "translations"];
   if (step === 2)
     return cardType === "digital"
       ? ["cardtype", "background", "envelope", "reveal", "cover"]
@@ -52,4 +64,48 @@ export function stepOf(tool: ToolId): Step {
 /** Panels that only exist on the digital rendition. */
 export function isDigitalOnly(tool: ToolId) {
   return DIGITAL_ONLY.includes(tool);
+}
+
+/* --------------------------------------------------------------- the flow */
+
+/**
+ * Create is a palette: open what you like, skip what you don't, in any order.
+ * Personalize and Finish are a form — every section is a decision that ends up
+ * on the order, so they are walked front to back.
+ *
+ * That difference is deliberate and visible: only these two steps number their
+ * rail and carry Back / Next.
+ */
+export function isGuided(step: Step) {
+  return step !== 1;
+}
+
+export type FlowStop = { step: Step; tool: ToolId };
+
+/**
+ * Every section of the guided part, in order, across both steps — so the last
+ * panel of Personalize leads into Finish rather than dead-ending.
+ */
+export function guidedFlow(cardType: CardType, product: Product): FlowStop[] {
+  return [
+    ...stepTools(2, cardType, product).map((tool) => ({ step: 2 as Step, tool })),
+    ...stepTools(3, cardType, product).map((tool) => ({ step: 3 as Step, tool })),
+  ];
+}
+
+/** Where a section sits in the flow, and what is either side of it. */
+export function flowPosition(
+  tool: ToolId,
+  cardType: CardType,
+  product: Product,
+) {
+  const flow = guidedFlow(cardType, product);
+  const index = flow.findIndex((s) => s.tool === tool);
+  if (index < 0) return null;
+  return {
+    index,
+    total: flow.length,
+    prev: index > 0 ? flow[index - 1] : null,
+    next: index < flow.length - 1 ? flow[index + 1] : null,
+  };
 }

@@ -2,10 +2,17 @@
 
 import { motion } from "motion/react";
 import { Minus, Plus } from "lucide-react";
-import { PanelBody, Section } from "@/components/rail/panels/parts";
+import { PanelBody, Section, Toggle } from "@/components/rail/panels/parts";
 import { PRINT_SPEC } from "@/lib/fulfilment";
 import { staggerParent } from "@/lib/motion";
 import { findEnvelopeLook } from "@/lib/digital-card";
+import {
+  ENVELOPE_ADD_ON,
+  QUANTITY_BREAKS,
+  breakFor,
+  priceOf,
+  unitPrice,
+} from "@/lib/pricing";
 import { useEditorStore } from "@/store/editor-store";
 
 /**
@@ -17,8 +24,22 @@ export function PrintOptionsPanel() {
   const setFulfilment = useEditorStore((s) => s.setFulfilment);
   const envelope = useEditorStore((s) => s.envelope);
   const look = useEditorStore((s) => findEnvelopeLook(s.digital.envelopeLook));
+  const product = useEditorStore((s) => s.product);
+  const orientation = useEditorStore((s) => s.invitation.orientation);
+  const envelopeAddOn = useEditorStore((s) => s.envelopeAddOn);
+  const setEnvelopeAddOn = useEditorStore((s) => s.setEnvelopeAddOn);
+  const isInvitation = product === "invitation";
+
+  const tier = breakFor(product, quantity);
+  const base = priceOf("printed", product).unit;
+  const each = unitPrice(product, "printed", quantity);
 
   const spec: [string, string][] = [
+    ...(isInvitation
+      ? ([
+          ["Trim", `A7 · ${orientation === "portrait" ? "5×7 portrait" : "7×5 landscape"}`],
+        ] as [string, string][])
+      : []),
     ["Stock", PRINT_SPEC.stock],
     ["Corners", PRINT_SPEC.corners],
     [
@@ -63,7 +84,54 @@ export function PrintOptionsPanel() {
               </motion.button>
             </span>
           </div>
+
+          {isInvitation && (
+            <div className="mt-2.5 rounded-[12px] bg-surface-sunken/70 p-3">
+              <div className="flex items-baseline justify-between gap-3">
+                <span className="text-[13px] text-ink-soft">
+                  {tier ? `${tier.from}+ price` : "Each"}
+                </span>
+                <span className="text-[13.5px] font-semibold tabular-nums text-ink">
+                  ${each.toFixed(2)}
+                  {tier && (
+                    <span className="ml-1.5 text-[12px] font-medium text-ink-faint line-through">
+                      ${base.toFixed(2)}
+                    </span>
+                  )}
+                </span>
+              </div>
+              <p className="mt-1.5 text-[12px] leading-snug text-ink-faint">
+                {tier
+                  ? `${Math.round(tier.discount * 100)}% off at ${tier.from} or more.`
+                  : `Invitations go out to a guest list, so they break at ${QUANTITY_BREAKS.map((b) => b.from).join(", ")}.`}
+              </p>
+            </div>
+          )}
         </Section>
+
+        {isInvitation && (
+          <Section title="Envelopes">
+            <label className="flex items-center justify-between gap-3 rounded-[12px] border border-hairline px-3.5 py-3">
+              <span>
+                <span className="block text-[14px] font-medium text-ink">
+                  Add envelopes
+                </span>
+                <span className="mt-0.5 block text-[12px] text-ink-faint tabular-nums">
+                  ${ENVELOPE_ADD_ON.toFixed(2)} per invitation
+                </span>
+              </span>
+              <Toggle
+                checked={envelopeAddOn}
+                onChange={setEnvelopeAddOn}
+                label="Add envelopes"
+              />
+            </label>
+            <p className="mt-2.5 text-[12px] leading-snug text-ink-faint">
+              A greeting card comes with its mailer. Invitations are often
+              hand-delivered or already have envelopes, so they are chosen.
+            </p>
+          </Section>
+        )}
 
         <Section title="Every copy">
           <dl className="overflow-hidden rounded-[12px] border border-hairline">

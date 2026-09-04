@@ -1,4 +1,5 @@
 import {
+  CalendarHeart,
   ImagePlay,
   MapPin,
   Printer,
@@ -15,7 +16,7 @@ import {
   Type,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
-import type { ToolId } from "@/lib/types";
+import type { Product, ToolId } from "@/lib/types";
 
 export type ToolDef = {
   id: ToolId;
@@ -35,6 +36,12 @@ export const TOOLS: ToolDef[] = [
     label: "Styles",
     icon: Shapes,
     blurb: "Swap the look of this card — art direction, palette, and vibe.",
+  },
+  {
+    id: "event",
+    label: "Event",
+    icon: CalendarHeart,
+    blurb: "The details your invitation is rendered from.",
   },
   {
     id: "message",
@@ -115,6 +122,19 @@ export const TOOLS: ToolDef[] = [
     blurb: "Everything you have decided, before it ships.",
   },
 ];
+
+/**
+ * A couple of panels are named for the greeting card they were built for.
+ * Invitations use the same panel under the name that fits the product.
+ */
+const INVITATION_LABELS: Partial<Record<ToolId, string>> = {
+  cardtype: "Format",
+  printopts: "Print options",
+};
+
+export function toolLabel(tool: ToolDef, product: Product) {
+  return (product === "invitation" && INVITATION_LABELS[tool.id]) || tool.label;
+}
 
 export function toolsForStep(ids: ToolId[]) {
   return ids

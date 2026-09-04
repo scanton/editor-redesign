@@ -14,6 +14,7 @@ import {
 import useImage from "use-image";
 import { useFontFamilies } from "@/components/canvas/use-font-families";
 import { cardTransform } from "@/lib/card-transform";
+import { QR_IMAGE, QR_SHAPES } from "@/lib/invitation";
 import type { EditorNode, ImageNode } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
 
@@ -72,6 +73,10 @@ export default function CardStage({ width, height }: Props) {
           {face.nodes.map((node) => (
             <NodeView key={node.id} node={node} resolveFont={resolveFont} />
           ))}
+
+          {/* Composited onto the finished artwork rather than rendered into
+              it, which is why moving it never costs a re-render. */}
+          <QrNode face={face} />
         </Group>
       </Layer>
     </Stage>
@@ -176,10 +181,19 @@ function NodeView({
 /**
  * The finished artwork. Loading is async, so the card paints its flat colour
  * until the bitmap arrives rather than flashing an empty rectangle.
+ *
+ * "cover" centre-crops the bitmap into its frame instead of stretching it —
+ * what lets one portrait render sit on a landscape trim without distorting.
  */
 function ArtworkNode({ node }: { node: ImageNode }) {
   const [image] = useImage(node.src);
   if (!image) return null;
+
+  const crop =
+    node.fit === "cover"
+      ? coverCrop(image.width, image.height, node.width, node.height)
+      : undefined;
+
   return (
     <KonvaImage
       image={image}
@@ -187,8 +201,76 @@ function ArtworkNode({ node }: { node: ImageNode }) {
       y={node.y}
       width={node.width}
       height={node.height}
+      crop={crop}
+      cornerRadius={node.cornerRadius}
       rotation={node.rotation}
       opacity={node.opacity}
     />
+  );
+}
+
+/** The largest centred region of the source that matches the frame's shape. */
+function coverCrop(
+  sw: number,
+  sh: number,
+  fw: number,
+  fh: number,
+): { x: number; y: number; width: number; height: number } {
+  const want = fw / fh;
+  const have = sw / sh;
+  if (have > want) {
+    const width = sh * want;
+    return { x: (sw - width) / 2, y: 0, width, height: sh };
+  }
+  const height = sw / want;
+  return { x: 0, y: (sh - height) / 2, width: sw, height };
+}
+
+/**
+ * The RSVP code on the back panel. Held as fractions of the trim so it keeps
+ * its place through an orientation change, and drawn here so it is part of the
+ * card wherever you are in the editor — the drag handles live in the DOM layer
+ * above, and only while the Event panel is open.
+ */
+function QrNode({ face }: { face: { id: string; width: number; height: number } }) {
+  const [image] = useImage(QR_IMAGE);
+  const show = useEditorStore(
+    (s) =>
+      s.product === "invitation" &&
+      s.invitation.qrOn &&
+      s.invitation.rsvpOn &&
+      face.id === "back",
+  );
+  const qr = useEditorStore((s) => s.invitation.qr);
+  const shape = useEditorStore((s) => s.invitation.qrShape);
+
+  if (!show || !image) return null;
+
+  const size = qr.width * face.width;
+  const pad = size * 0.06;
+  const radius = QR_SHAPES.find((s) => s.value === shape)!.radius;
+  const scale = size / 100;
+
+  return (
+    <Group x={qr.x * face.width - size / 2} y={qr.y * face.height - size / 2}>
+      <Rect
+        width={size}
+        height={size}
+        fill="#ffffff"
+        cornerRadius={radius * scale}
+        shadowColor="#000000"
+        shadowBlur={18 * scale}
+        shadowOpacity={0.45}
+        shadowOffsetY={4 * scale}
+      />
+      <KonvaImage
+        image={image}
+        x={pad}
+        y={pad}
+        width={size - pad * 2}
+        height={size - pad * 2}
+        cornerRadius={Math.max(0, radius - 4) * scale}
+      />
+    </Group>
   );
 }

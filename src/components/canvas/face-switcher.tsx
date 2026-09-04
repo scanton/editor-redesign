@@ -6,7 +6,9 @@ import type { FaceId } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
 import { cn } from "@/lib/utils";
 
-const ORDER: FaceId[] = ["front", "inside", "back"];
+/** A greeting card folds; an invitation is two panels with nothing between. */
+const CARD_FACES: FaceId[] = ["front", "inside", "back"];
+const INVITATION_FACES: FaceId[] = ["front", "back"];
 
 /** A face's thumbnail is its artwork, falling back to its flat colour. */
 function artworkOf(face: { nodes: { kind: string; src?: string }[] }) {
@@ -20,6 +22,9 @@ export function FaceSwitcher() {
   const surface = useEditorStore((s) => s.surface);
   const setSurface = useEditorStore((s) => s.setSurface);
   const envelopeColour = useEditorStore((s) => s.digital.envelopeColour);
+  const order = useEditorStore((s) =>
+    s.product === "invitation" ? INVITATION_FACES : CARD_FACES,
+  );
   // Only the digital card has an envelope you can look at before it opens.
   const hasEnvelopeFace = useEditorStore((s) => s.cardType === "digital");
 
@@ -32,7 +37,7 @@ export function FaceSwitcher() {
         transition={{ ...springBouncy, delay: 0.15 }}
         className="pointer-events-auto flex items-end gap-3 rounded-[20px] border border-hairline bg-surface/85 px-3 py-2.5 shadow-rail backdrop-blur"
       >
-        {ORDER.map((id) => {
+        {order.map((id) => {
           const f = doc.faces[id];
           const isActive = surface === "card" && face === id;
           return (

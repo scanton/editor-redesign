@@ -1,12 +1,12 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Link2, Mail, Package, Send, Video } from "lucide-react";
+import { Link2, Mail, MessageSquare, Package, Send, Video } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import { PanelBody, Section } from "@/components/rail/panels/parts";
 import { springTight, staggerParent } from "@/lib/motion";
 import {
-  DIGITAL_DELIVERY,
+  digitalDeliveryFor,
   PRINTED_DELIVERY,
   type DigitalDelivery,
   type PrintedDelivery,
@@ -17,18 +17,25 @@ import { cn } from "@/lib/utils";
 const ICONS: Record<string, LucideIcon> = {
   link: Link2,
   email: Mail,
+  sms: MessageSquare,
   video: Video,
   mail: Send,
   ship: Package,
 };
 
+/** A delivery option without an icon should look plain, not take the panel down. */
+function iconFor(id: string): LucideIcon {
+  return ICONS[id] ?? Send;
+}
+
 /** How the card reaches them. Different question for each rendition. */
 export function DeliveryPanel() {
   const isDigital = useEditorStore((s) => s.cardType === "digital");
+  const product = useEditorStore((s) => s.product);
   const fulfilment = useEditorStore((s) => s.fulfilment);
   const setFulfilment = useEditorStore((s) => s.setFulfilment);
 
-  const options = isDigital ? DIGITAL_DELIVERY : PRINTED_DELIVERY;
+  const options = isDigital ? digitalDeliveryFor(product) : PRINTED_DELIVERY;
   const current = isDigital
     ? fulfilment.digitalDelivery
     : fulfilment.printedDelivery;
@@ -40,7 +47,7 @@ export function DeliveryPanel() {
           <div className="flex flex-col gap-2.5">
             {options.map((option) => {
               const on = current === option.id;
-              const Icon = ICONS[option.id];
+              const Icon = iconFor(option.id);
               return (
                 <motion.button
                   key={option.id}

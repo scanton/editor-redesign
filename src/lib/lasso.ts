@@ -39,6 +39,21 @@ export function boundsOf(points: number[]): AnnotationRect {
   return { x: minX, y: minY, width: maxX - minX, height: maxY - minY };
 }
 
+/**
+ * What a painted mask covers: the stroke path plus half a brush on every side,
+ * because a brush marks around its centre line rather than along it.
+ */
+export function paintedBounds(strokes: number[][], brush: number): AnnotationRect {
+  const pad = brush / 2;
+  const bounds = boundsOf(strokes.flat());
+  return {
+    x: bounds.x - pad,
+    y: bounds.y - pad,
+    width: bounds.width + brush,
+    height: bounds.height + brush,
+  };
+}
+
 /** Card-space points → an SVG `points` attribute in screen space. */
 export function toSvgPoints(points: number[], t: CardTransform): string {
   const out: string[] = [];
