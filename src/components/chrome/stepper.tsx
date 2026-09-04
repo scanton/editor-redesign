@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { AlertTriangle, Check } from "lucide-react";
 import { Tooltip } from "@/components/ui/tooltip";
 import { springBouncy, springTight } from "@/lib/motion";
-import { STEPS } from "@/lib/steps";
+import { STEPS, isGuided, stepTools } from "@/lib/steps";
 import { useWarnings } from "@/lib/warnings";
 import { useEditorStore } from "@/store/editor-store";
 import { cn } from "@/lib/utils";
@@ -16,6 +16,9 @@ import { cn } from "@/lib/utils";
 export function Stepper() {
   const step = useEditorStore((s) => s.step);
   const setStep = useEditorStore((s) => s.setStep);
+  const cardType = useEditorStore((s) => s.cardType);
+  const product = useEditorStore((s) => s.product);
+  const visited = useEditorStore((s) => s.visited);
   const warnings = useWarnings();
 
   return (
@@ -23,6 +26,10 @@ export function Stepper() {
       {STEPS.map((s, i) => {
         const current = s.id === step;
         const done = s.id < step;
+        // Guided steps have sections to get through; Create does not, so it
+        // never wears a progress ring.
+        const sections = isGuided(s.id) ? stepTools(s.id, cardType, product) : [];
+        const passed = sections.filter((t) => visited.includes(t)).length;
         return (
           <div key={s.id} className="flex items-center gap-1">
             {i > 0 && <span className="h-px w-4 bg-hairline-strong" />}
@@ -39,17 +46,51 @@ export function Stepper() {
                   current ? "text-ink" : "text-ink-faint hover:text-ink-soft",
                 )}
               >
-                <span
-                  className={cn(
-                    "flex h-6 w-6 shrink-0 items-center justify-center rounded-full border text-[11.5px] font-semibold tabular-nums",
-                    done
-                      ? "border-brand-red bg-brand-red text-white"
-                      : current
-                        ? "border-ink text-ink"
-                        : "border-hairline-strong text-ink-faint",
+                <span className="relative flex h-6 w-6 shrink-0 items-center justify-center">
+                  <span
+                    className={cn(
+                      "flex h-6 w-6 items-center justify-center rounded-full border text-[11.5px] font-semibold tabular-nums",
+                      done
+                        ? "border-brand-red bg-brand-red text-white"
+                        : current
+                          ? "border-ink text-ink"
+                          : "border-hairline-strong text-ink-faint",
+                      // The ring draws the edge, so the border steps aside.
+                      !done && sections.length > 0 && "border-transparent",
+                    )}
+                  >
+                    {done ? <Check size={12} strokeWidth={3} /> : s.id}
+                  </span>
+
+                  {!done && sections.length > 0 && (
+                    <svg
+                      aria-hidden
+                      viewBox="0 0 24 24"
+                      className="pointer-events-none absolute inset-0 -rotate-90"
+                    >
+                      <circle
+                        cx="12"
+                        cy="12"
+                        r="11"
+                        fill="none"
+                        strokeWidth="2"
+                        className="stroke-hairline-strong"
+                      />
+                      <motion.circle
+                        cx="12"
+                        cy="12"
+                        r="11"
+                        fill="none"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        className={current ? "stroke-ink" : "stroke-brand-red"}
+                        style={{ pathLength: passed / sections.length }}
+                        initial={false}
+                        animate={{ pathLength: passed / sections.length }}
+                        transition={springBouncy}
+                      />
+                    </svg>
                   )}
-                >
-                  {done ? <Check size={12} strokeWidth={3} /> : s.id}
                 </span>
                 {/* Two products, three steps and the view controls all want
                     the same bar. Below a wide viewport only the step you are

@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { X } from "lucide-react";
 import { IconButton } from "@/components/ui/icon-button";
 import { TOOLS, toolLabel } from "@/components/rail/tools";
+import { FlowNav } from "@/components/rail/flow-nav";
 import { BackgroundPanel } from "@/components/rail/panels/background-panel";
 import { CardTypePanel } from "@/components/rail/panels/card-type-panel";
 import { DeliveryPanel } from "@/components/rail/panels/delivery-panel";
@@ -89,6 +90,8 @@ export function Flyout() {
 
             {/* Keyed so each tool's panel remounts with its own entrance stagger. */}
             <Panel key={tool.id} />
+
+            <FlowNav />
           </aside>
         </motion.div>
       )}

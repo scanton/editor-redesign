@@ -65,3 +65,47 @@ export function stepOf(tool: ToolId): Step {
 export function isDigitalOnly(tool: ToolId) {
   return DIGITAL_ONLY.includes(tool);
 }
+
+/* --------------------------------------------------------------- the flow */
+
+/**
+ * Create is a palette: open what you like, skip what you don't, in any order.
+ * Personalize and Finish are a form — every section is a decision that ends up
+ * on the order, so they are walked front to back.
+ *
+ * That difference is deliberate and visible: only these two steps number their
+ * rail and carry Back / Next.
+ */
+export function isGuided(step: Step) {
+  return step !== 1;
+}
+
+export type FlowStop = { step: Step; tool: ToolId };
+
+/**
+ * Every section of the guided part, in order, across both steps — so the last
+ * panel of Personalize leads into Finish rather than dead-ending.
+ */
+export function guidedFlow(cardType: CardType, product: Product): FlowStop[] {
+  return [
+    ...stepTools(2, cardType, product).map((tool) => ({ step: 2 as Step, tool })),
+    ...stepTools(3, cardType, product).map((tool) => ({ step: 3 as Step, tool })),
+  ];
+}
+
+/** Where a section sits in the flow, and what is either side of it. */
+export function flowPosition(
+  tool: ToolId,
+  cardType: CardType,
+  product: Product,
+) {
+  const flow = guidedFlow(cardType, product);
+  const index = flow.findIndex((s) => s.tool === tool);
+  if (index < 0) return null;
+  return {
+    index,
+    total: flow.length,
+    prev: index > 0 ? flow[index - 1] : null,
+    next: index < flow.length - 1 ? flow[index + 1] : null,
+  };
+}

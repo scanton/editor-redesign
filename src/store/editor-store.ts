@@ -190,6 +190,15 @@ type EditorState = {
   setReveal: (patch: Partial<EditorState["digital"]["reveal"]>) => void;
   setCover: (patch: Partial<EditorState["digital"]["cover"]>) => void;
   toggleRevealStep: (id: string) => void;
+  /**
+   * Sections of the guided steps that have been opened. Personalize and Finish
+   * are walked front to back, so the rail needs to show what has been passed
+   * and what is still ahead.
+   */
+  visited: ToolId[];
+  /** Move to a section, crossing into another step if that is where it is. */
+  goTo: (step: Step, tool: ToolId | null) => void;
+
   /** Flyout stays mounted but collapses when the rail is pinned closed. */
   railPinned: boolean;
   zoom: number;
@@ -295,6 +304,12 @@ function cloneDoc(doc: CardDoc): CardDoc {
   return structuredClone(doc);
 }
 
+/** Records a section as passed. Opening it is the visit; nothing is required. */
+function visit(visited: ToolId[], tool: ToolId | null): ToolId[] {
+  if (!tool || visited.includes(tool)) return visited;
+  return [...visited, tool];
+}
+
 /**
  * The detail list always ends in one blank row, unless it is full — which is
  * what makes it grow as you fill it instead of needing an Add button.
@@ -322,6 +337,7 @@ type Stash = {
   face: FaceId;
   past: CardDoc[];
   future: CardDoc[];
+  visited: ToolId[];
 };
 
 /**
@@ -353,6 +369,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       face: state.face,
       past: state.past,
       future: state.future,
+      visited: state.visited,
     };
     const resumed =
       stash[product] ??
@@ -364,6 +381,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         face: "front",
         past: [],
         future: [],
+        visited: [],
       } satisfies Stash);
     stash[state.product] = parked;
     stash[product] = null;
@@ -380,6 +398,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       face: resumed.face,
       past: resumed.past,
       future: resumed.future,
+      visited: visit(resumed.visited, keeps ? tool : STEP_DEFAULT_TOOL[state.step]),
       activeTool: keeps ? tool : STEP_DEFAULT_TOOL[state.step],
       surface: "card",
       canvasMode: "element",
@@ -549,9 +568,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const keeps =
       tool !== null &&
       stepTools(step, get().cardType, get().product).includes(tool);
+    const opened = keeps ? tool : STEP_DEFAULT_TOOL[step];
     set({
       step,
-      activeTool: keeps ? tool : STEP_DEFAULT_TOOL[step],
+      activeTool: opened,
+      visited: visit(get().visited, opened),
       agentOpen: step !== 3,
       canvasMode: "element",
       draftAnnotation: null,
@@ -570,6 +591,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({
       cardType,
       activeTool: keeps ? activeTool : "cardtype",
+      // The rendition decides which sections exist, so a switch changes what
+      // is still ahead — but what has been passed stays passed.
+      visited: visit(get().visited, keeps ? activeTool : "cardtype"),
       surface: "card",
     });
   },
@@ -705,9 +729,26 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set({ face, draftAnnotation: null, draftLasso: null, hoverSegment: null });
     get().maybeFit();
   },
-  setTool: (activeTool) => set({ activeTool }),
+  visited: [],
+  goTo: (step, tool) =>
+    set((s) => ({
+      step,
+      activeTool: tool,
+      visited: visit(s.visited, tool),
+      surface: "card",
+      canvasMode: "element",
+      draftAnnotation: null,
+      draftLasso: null,
+      eraserStrokes: [],
+    })),
+
+  setTool: (activeTool) =>
+    set((s) => ({ activeTool, visited: visit(s.visited, activeTool) })),
   toggleTool: (tool) =>
-    set((s) => ({ activeTool: s.activeTool === tool ? null : tool })),
+    set((s) => {
+      const activeTool = s.activeTool === tool ? null : tool;
+      return { activeTool, visited: visit(s.visited, activeTool) };
+    }),
   setRailPinned: (railPinned) => set({ railPinned }),
 
   setZoom: (zoom) => set({ zoom: clamp(zoom, 0.1, 4), zoomTouched: true }),
