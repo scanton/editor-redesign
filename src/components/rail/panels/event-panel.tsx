@@ -14,9 +14,10 @@ import {
 import { springTight, staggerParent } from "@/lib/motion";
 import {
   DETAIL_TYPES,
-  MAX_DETAILS,
+  MAX_PRINTED,
   findDetailType,
   labelOf,
+  printedRows,
   type DetailRow,
   type DetailType,
 } from "@/lib/event-details";
@@ -34,81 +35,25 @@ import { cn } from "@/lib/utils";
  * invitation is described — these fields are the data the image model bakes
  * into the back panel, not text you edit on the canvas.
  *
- * The eye on each detail is the load-bearing control: everything here is
+ * Nothing is fixed. A gathering with no venue, or no set time, or no host
+ * worth printing is an ordinary invitation, so every field is a row that can
+ * be taken out and put back. What the schema calls required is reported as
+ * unfinished work rather than enforced as a wall.
+ *
+ * The eye on each row is the other load-bearing control: everything here is
  * collected and reaches the event page, and the eye decides which of it is
  * also printed.
  */
 export function EventPanel() {
-  const inv = useEditorStore((s) => s.invitation);
-  const set = useEditorStore((s) => s.setInvitation);
-
   return (
     <PanelBody>
       <motion.div variants={staggerParent} initial="hidden" animate="visible">
         <Section>
           <p className="text-[12.5px] leading-snug text-ink-faint">
             Your invitation re-renders from these details — the words are part of
-            the artwork, not a layer on top of it.
+            the artwork, not a layer on top of it. Every field is optional; keep
+            the ones this event actually has.
           </p>
-        </Section>
-
-        <Section title="Basics">
-          <Field label="Event name">
-            <input
-              className={inputClass}
-              value={inv.eventName}
-              onChange={(e) => set({ eventName: e.target.value })}
-            />
-          </Field>
-          <Field label="Tagline">
-            <input
-              className={inputClass}
-              value={inv.tagline}
-              onChange={(e) => set({ tagline: e.target.value })}
-            />
-          </Field>
-          <Field label="Hosted by">
-            <input
-              className={inputClass}
-              value={inv.hosts}
-              placeholder="Separate names with commas"
-              onChange={(e) => set({ hosts: e.target.value })}
-            />
-          </Field>
-        </Section>
-
-        <Section title="When">
-          <Field label="Date">
-            <input
-              className={inputClass}
-              value={inv.date}
-              onChange={(e) => set({ date: e.target.value })}
-            />
-          </Field>
-          <Field label="Time">
-            <input
-              className={inputClass}
-              value={inv.time}
-              onChange={(e) => set({ time: e.target.value })}
-            />
-          </Field>
-        </Section>
-
-        <Section title="Where">
-          <Field label="Venue">
-            <input
-              className={inputClass}
-              value={inv.locationName}
-              onChange={(e) => set({ locationName: e.target.value })}
-            />
-          </Field>
-          <Field label="Address">
-            <input
-              className={inputClass}
-              value={inv.address}
-              onChange={(e) => set({ address: e.target.value })}
-            />
-          </Field>
         </Section>
 
         <MoreDetails />
@@ -142,15 +87,16 @@ export function EventPanel() {
  */
 function MoreDetails() {
   const details = useEditorStore((s) => s.invitation.details);
-  const filled = details.filter((d) => d.type);
-  const full = filled.length >= MAX_DETAILS;
+  const typed = details.filter((d) => d.type);
+  const printed = printedRows(details).length;
+  const full = printed >= MAX_PRINTED;
 
   // Everything but a custom row is offered once.
-  const used = new Set(filled.map((d) => d.type));
+  const used = new Set(typed.map((d) => d.type));
 
   return (
     <Section
-      title="More details"
+      title="Details"
       action={
         <span
           className={cn(
@@ -158,13 +104,14 @@ function MoreDetails() {
             full ? "bg-brand-red/10 text-brand-red" : "bg-surface-sunken text-ink-faint",
           )}
         >
-          {filled.length} / {MAX_DETAILS}
+          {printed} / {MAX_PRINTED} printed
         </span>
       }
     >
       <p className="mb-3 text-[12.5px] leading-snug text-ink-faint">
         The eye chooses what renders on the invitation. Hidden fields are still
-        collected — they just live on your event page.
+        collected — they just live on your event page, and they do not count
+        against what has to fit.
       </p>
 
       <div className="flex flex-col gap-2.5">
@@ -178,7 +125,7 @@ function MoreDetails() {
       {full && (
         <p className="mt-2.5 text-[12px] leading-snug text-ink-faint">
           That is the most a back panel can hold and still be read across a
-          room. Remove one to add another.
+          room. Remove one, or close an eye to keep it to the event page.
         </p>
       )}
     </Section>

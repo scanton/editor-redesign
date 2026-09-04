@@ -5,13 +5,14 @@ import type { SchemaSlot } from "./invitation";
  * with the types the editor prototype offered.
  *
  * Each type knows what kind of input it needs, so a date gets a date picker and
- * a dress code gets its options rather than everything being a text box. It
- * also knows where it lands in `invitationDetails`: a named slot for the three
- * the schema calls out, and `customFields` for everything else.
+ * a dress code gets its options rather than everything being a text box, and
+ * where it lands in `invitationDetails` — a named slot, or `customFields`.
  *
- * Types the panel already owns as fixed fields — event name, hosts, venue,
- * address, start time, and the RSVP block — are deliberately absent. The
- * schema requires them, so they cannot be left to a list you might not add to.
+ * Every type is a row you can add and remove, the named ones included. An
+ * invitation to a thing with no venue, or no fixed time, or no host worth
+ * printing, is an ordinary invitation; the schema calling a field required
+ * does not make it true of every event. What it does mean is that leaving one
+ * out is worth flagging, so it is flagged rather than prevented.
  */
 export type DetailInputKind =
   | "text"
@@ -37,15 +38,75 @@ export type DetailType = {
   group: string;
 };
 
-/** At most this many details; past it the back panel stops being readable. */
-export const MAX_DETAILS = 10;
+/**
+ * At most this many details *on the invitation* — past that a back panel stops
+ * being readable across a room. Anything kept to the event page is uncapped,
+ * because nothing has to fit.
+ */
+export const MAX_PRINTED = 10;
 
 export const DETAIL_TYPES: DetailType[] = [
+  {
+    type: "eventName",
+    label: "Event name",
+    inputKind: "text",
+    group: "The event",
+    slot: "eventName",
+    onInvitation: true,
+  },
+  {
+    type: "tagline",
+    label: "Tagline",
+    inputKind: "text",
+    group: "The event",
+    slot: null,
+    onInvitation: true,
+  },
+  {
+    type: "hostNames",
+    label: "Hosted by",
+    inputKind: "text",
+    group: "The event",
+    slot: "hostNames",
+    onInvitation: true,
+  },
+  {
+    type: "eventDate",
+    label: "Date",
+    inputKind: "text",
+    group: "When",
+    slot: "date",
+    onInvitation: true,
+  },
+  {
+    type: "eventTime",
+    label: "Time",
+    inputKind: "text",
+    group: "When",
+    slot: "time",
+    onInvitation: true,
+  },
+  {
+    type: "venueName",
+    label: "Venue",
+    inputKind: "text",
+    group: "Where",
+    slot: "locationName",
+    onInvitation: true,
+  },
+  {
+    type: "venueAddress",
+    label: "Address",
+    inputKind: "text",
+    group: "Where",
+    slot: "address",
+    onInvitation: true,
+  },
   {
     type: "occasionType",
     label: "Occasion type",
     inputKind: "select",
-    group: "The event",
+    group: "Also on the event",
     slot: null,
     onInvitation: false,
     options: [
@@ -67,7 +128,7 @@ export const DETAIL_TYPES: DetailType[] = [
     type: "guestOfHonor",
     label: "Guest of honour",
     inputKind: "text",
-    group: "The event",
+    group: "Also on the event",
     slot: null,
     onInvitation: true,
   },
@@ -75,7 +136,7 @@ export const DETAIL_TYPES: DetailType[] = [
     type: "endDateTime",
     label: "End date & time",
     inputKind: "datetime-local",
-    group: "The event",
+    group: "When",
     slot: null,
     onInvitation: true,
   },
@@ -83,7 +144,7 @@ export const DETAIL_TYPES: DetailType[] = [
     type: "costPerPerson",
     label: "Cost per person",
     inputKind: "text",
-    group: "The event",
+    group: "Also on the event",
     slot: null,
     onInvitation: true,
   },
@@ -314,3 +375,43 @@ export function labelOf(row: DetailRow) {
 export function filledRows(rows: DetailRow[]) {
   return rows.filter((r) => r.type && (r.value.trim() || r.type === "eventSchedule"));
 }
+
+/** Rows that will be rendered into the artwork. */
+export function printedRows(rows: DetailRow[]) {
+  return filledRows(rows).filter((r) => r.onInvitation);
+}
+
+/** What one type currently says, wherever it sits in the list. */
+export function valueOfType(rows: DetailRow[], type: string) {
+  return rows.find((r) => r.type === type)?.value.trim() ?? "";
+}
+
+/** Whether a type is in the list at all — removed fields simply are not. */
+export function hasType(rows: DetailRow[], type: string) {
+  return rows.some((r) => r.type === type);
+}
+
+const ORDER = new Map(DETAIL_TYPES.map((t, i) => [t.type, i]));
+
+/**
+ * Where a newly typed row belongs. Rows sort into catalogue order rather than
+ * landing wherever they were added, so removing Date and putting it back does
+ * not leave it stranded at the bottom of the invitation.
+ */
+export function sortRows(rows: DetailRow[]) {
+  return [...rows].sort(
+    (a, b) => (ORDER.get(a.type) ?? 999) - (ORDER.get(b.type) ?? 999),
+  );
+}
+
+/** A starting invitation: the fields most events actually print. */
+export const SEED_TYPES = [
+  "eventName",
+  "tagline",
+  "hostNames",
+  "eventDate",
+  "eventTime",
+  "venueName",
+  "venueAddress",
+  "dressCode",
+];

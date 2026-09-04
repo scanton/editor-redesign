@@ -51,10 +51,19 @@ export type InvitationDetails = {
 };
 
 /**
- * Optional fields the schema names outright. A detail bound to one of these
- * fills its slot; anything else lands in `customFields`.
+ * Fields the schema names outright. A detail bound to one of these fills its
+ * slot; anything else lands in `customFields`.
  */
-export type SchemaSlot = "dresscode" | "instructions" | "schedule";
+export type SchemaSlot =
+  | "eventName"
+  | "hostNames"
+  | "date"
+  | "time"
+  | "locationName"
+  | "address"
+  | "dresscode"
+  | "instructions"
+  | "schedule";
 
 /** Rows in a schedule detail, kept as text so the demo stays editable. */
 export type ScheduleRow = { time: string; item: string };
@@ -242,15 +251,12 @@ export const INVITATION_FACES = ["front", "back"] as const;
 
 /* ----------------------------------------------------------- the payload */
 
-/** Everything the Event panel collects, in the shape the store holds it. */
+/**
+ * Everything the Event panel collects, in the shape the store holds it. The
+ * event's fields are all rows — there are no fixed ones left, because no field
+ * is true of every invitation.
+ */
 export type InvitationInput = {
-  eventName: string;
-  tagline: string;
-  hosts: string;
-  date: string;
-  time: string;
-  locationName: string;
-  address: string;
   details: DetailRow[];
   schedule: ScheduleRow[];
   rsvpOn: boolean;
@@ -278,14 +284,10 @@ export function buildInvitationDetails(inv: InvitationInput): InvitationDetails 
   // Only rows that have been given a type, and only those meant to be printed.
   const printed = inv.details.filter((d) => d.type && d.onInvitation);
   const slotOf = (row: DetailRow) => findDetailType(row.type)?.slot ?? null;
-
-  const slotValue = (slot: SchemaSlot) =>
-    printed.find((d) => slotOf(d) === slot && d.value.trim())?.value.trim() ??
-    null;
+  const bySlot = (slot: SchemaSlot) =>
+    printed.find((d) => slotOf(d) === slot)?.value.trim() ?? "";
 
   const custom: { label: string; value: string }[] = [];
-  if (inv.tagline.trim())
-    custom.push({ label: "tagline", value: inv.tagline.trim() });
   if (inv.rsvpOn && inv.rsvpLine.trim())
     custom.push({ label: "rsvpLine", value: inv.rsvpLine.trim() });
   for (const d of printed)
@@ -295,20 +297,20 @@ export function buildInvitationDetails(inv: InvitationInput): InvitationDetails 
   const hasSchedule = printed.some((d) => slotOf(d) === "schedule");
 
   return {
-    eventName: inv.eventName.trim(),
-    hostNames: inv.hosts
+    eventName: bySlot("eventName"),
+    hostNames: bySlot("hostNames")
       .split(",")
       .map((n) => n.trim())
       .filter(Boolean),
-    date: inv.date.trim(),
-    time: inv.time.trim(),
-    locationName: inv.locationName.trim(),
-    address: inv.address.trim(),
+    date: bySlot("date"),
+    time: bySlot("time"),
+    locationName: bySlot("locationName"),
+    address: bySlot("address"),
     rsvpMethod: inv.rsvpMethod,
     rsvpValue: inv.rsvpValue.trim(),
     rsvpDeadline: inv.rsvpOn ? inv.rsvpDeadline.trim() || null : null,
-    dresscode: slotValue("dresscode"),
-    instructions: slotValue("instructions"),
+    dresscode: bySlot("dresscode") || null,
+    instructions: bySlot("instructions") || null,
     schedule: hasSchedule
       ? inv.schedule.filter((r) => r.time.trim() || r.item.trim())
       : [],
@@ -316,16 +318,29 @@ export function buildInvitationDetails(inv: InvitationInput): InvitationDetails 
   };
 }
 
-/** Required fields the schema will not accept as blank. */
+/**
+ * Fields the schema marks required. Removing one is allowed — plenty of events
+ * have no venue, or no host worth naming — so this reports rather than blocks,
+ * and it reads the whole list rather than the render payload: a field kept to
+ * the event page is collected, just not printed.
+ */
+const REQUIRED: { slot: SchemaSlot; label: string }[] = [
+  { slot: "eventName", label: "Event name" },
+  { slot: "hostNames", label: "Hosts" },
+  { slot: "date", label: "Date" },
+  { slot: "time", label: "Time" },
+  { slot: "locationName", label: "Venue" },
+  { slot: "address", label: "Address" },
+];
+
 export function missingRequired(inv: InvitationInput): string[] {
-  const d = buildInvitationDetails(inv);
-  const gaps: string[] = [];
-  if (!d.eventName) gaps.push("Event name");
-  if (d.hostNames.length === 0) gaps.push("Hosts");
-  if (!d.date) gaps.push("Date");
-  if (!d.time) gaps.push("Time");
-  if (!d.locationName) gaps.push("Venue");
-  if (!d.address) gaps.push("Address");
-  if (inv.rsvpOn && !d.rsvpValue) gaps.push("RSVP destination");
+  const filled = new Set(
+    inv.details
+      .filter((d) => d.value.trim())
+      .map((d) => findDetailType(d.type)?.slot)
+      .filter(Boolean),
+  );
+  const gaps = REQUIRED.filter((r) => !filled.has(r.slot)).map((r) => r.label);
+  if (inv.rsvpOn && !inv.rsvpValue.trim()) gaps.push("RSVP destination");
   return gaps;
 }
