@@ -49,7 +49,10 @@ export function PlacementLayer({
    * back.
    */
   dim?: boolean;
-  /** Double-clicking the box, for whatever opening it means to the owner. */
+  /**
+   * Clicking the box — a press that moves is a drag, a press that does not is
+   * a click. Corner handles never count, since sizing is not opening.
+   */
   onActivate?: () => void;
 }) {
   const face = useEditorStore((s) => s.doc.faces[s.face]);
@@ -57,6 +60,12 @@ export function PlacementLayer({
 
   const hostRef = useRef<HTMLDivElement>(null);
   const maskId = useId();
+  // A gesture is a drag or a click, and which one it was is only known when it
+  // ends. Kept in a ref because pointer moves coalesce and would otherwise be
+  // read from a render that has not happened yet.
+  const gestureRef = useRef<{ mode: "move" | Handle; moved: boolean } | null>(
+    null,
+  );
   const dragRef = useRef<{
     mode: "move" | Handle;
     origin: { x: number; y: number };
@@ -82,6 +91,7 @@ export function PlacementLayer({
     try {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
     } catch {}
+    gestureRef.current = { mode, moved: false };
     dragRef.current = { mode, origin: pointIn(e), start: { ...rect } };
   };
 
@@ -91,6 +101,10 @@ export function PlacementLayer({
     const now = pointIn(e);
     const dx = now.x - drag.origin.x;
     const dy = now.y - drag.origin.y;
+    // A couple of pixels of travel is a hand shaking, not an intent to move.
+    if (gestureRef.current && (Math.abs(dx) > 3 || Math.abs(dy) > 3)) {
+      gestureRef.current.moved = true;
+    }
     const next = resize(drag.mode, drag.start, dx, dy, safe);
     latestRef.current = next;
     onChange(next);
@@ -99,6 +113,14 @@ export function PlacementLayer({
   const end = () => {
     if (!dragRef.current) return;
     dragRef.current = null;
+
+    const gesture = gestureRef.current;
+    gestureRef.current = null;
+    if (gesture && gesture.mode === "move" && !gesture.moved) {
+      onActivate?.();
+      return;
+    }
+
     // The last pointermove may not have re-rendered yet, so commit from the ref
     // rather than the render closure.
     onCommit?.(latestRef.current ?? rect);
@@ -160,7 +182,6 @@ export function PlacementLayer({
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
-        onDoubleClick={onActivate}
         className="pointer-events-auto absolute cursor-move rounded-[6px] border-2 border-brand-red bg-brand-red/5"
         style={box}
       >

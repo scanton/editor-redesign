@@ -174,9 +174,9 @@ export function LongFormPanel() {
               on the inside spread
             </p>
             <p className="mt-1.5 text-[12px] leading-snug text-ink-faint">
-              Drag the box on the card to move it, pull a corner to resize, or
-              double-click to type into it — the words are yours to change, and
-              the type refits whatever you do. It stays{" "}
+              Click the box on the card to type into it, drag it to move, or
+              pull a corner to resize — the words are yours to change, and the
+              type refits whatever you do. It stays{" "}
               {(CUT_SAFE_MARGIN / PX_PER_INCH).toFixed(1)}″ clear of the trim
               edge so nothing is lost when the card is cut.
             </p>
@@ -227,7 +227,12 @@ function SetIn() {
 
       <p
         className="mt-1 rounded-[12px] px-3 py-2.5 text-[15px] leading-snug"
-        style={{ fontFamily: fontCssVar(fontFamily), color: fill, background: "#2a2a2e" }}
+        style={{
+          fontFamily: fontCssVar(fontFamily),
+          color: fill,
+          // The specimen sits on the panel the words will sit on.
+          background: "rgba(250,248,243,0.9)",
+        }}
       >
         The quick brown fox, set the way it will print.
       </p>

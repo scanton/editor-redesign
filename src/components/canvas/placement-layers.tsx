@@ -52,7 +52,7 @@ export function PlacementLayers({
       <PlacementLayer
         viewport={viewport}
         rect={longForm.rect}
-        label={`${option?.label ?? "Long-form text"} · double-click to edit`}
+        label={`${option?.label ?? "Long-form text"} · click to edit`}
         // The artwork steps back so the block can be read against it.
         dim
         // Refit as it moves, so the type is always filling the box rather than

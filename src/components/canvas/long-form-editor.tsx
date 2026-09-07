@@ -79,7 +79,7 @@ export function LongFormEditor({
           onPointerDown={(e) => e.stopPropagation()}
           spellCheck
           placeholder="Type or paste your words…"
-          className="scroll-slim h-full w-full resize-none bg-transparent p-0 caret-white focus:outline-none"
+          className="scroll-slim h-full w-full resize-none bg-transparent p-0 focus:outline-none"
           style={{
             color: fill,
             fontFamily: fontCssVar(node?.fontFamily ?? fontFamily),

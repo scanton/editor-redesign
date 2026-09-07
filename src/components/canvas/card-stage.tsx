@@ -108,7 +108,7 @@ export default function CardStage({ width, height }: Props) {
                   width={preview.width + 52}
                   height={preview.height + 52}
                   cornerRadius={20}
-                  fill="rgba(18,18,20,0.55)"
+                  fill="rgba(255,255,255,0.7)"
                   listening={false}
                 />
               )}
