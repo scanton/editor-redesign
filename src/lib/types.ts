@@ -3,6 +3,7 @@ export type FaceId = "front" | "inside" | "back";
 export type ToolId =
   | "styles"
   | "event"
+  | "stickers"
   | "message"
   | "signature"
   | "translations"
@@ -110,7 +111,27 @@ export type DrawNode = BaseNode & {
   typed?: { text: string; fontFamily: string; fill: string };
 };
 
-export type EditorNode = TextNode | ImageNode | ShapeNode | DrawNode;
+/**
+ * A sticker. A glyph today and a drawn asset later — either way it sits on top
+ * of the finished artwork rather than being rendered into it, so moving one
+ * costs nothing.
+ */
+export type StickerNode = BaseNode & {
+  kind: "sticker";
+  /** Catalogue id, or "made" for one the agent rendered from a description. */
+  stickerId: string;
+  glyph: string;
+  label: string;
+  /** Square, so one number is enough. */
+  size: number;
+};
+
+export type EditorNode =
+  | TextNode
+  | ImageNode
+  | ShapeNode
+  | DrawNode
+  | StickerNode;
 
 export type Address = {
   name: string;

@@ -264,3 +264,107 @@ Six. You have been, quietly and without fuss, the best of us.`,
 export function sampleFor(shape: LongFormShape) {
   return SAMPLES[shape];
 }
+
+/* ------------------------------------------------------------- the approach */
+
+/**
+ * How the words get made. Picking a kind is only half the question — the other
+ * half is how much of the writing the customer wants to do, which is a
+ * conversation with the agent rather than a setting on a panel.
+ */
+export type LongFormApproach = "paste" | "polish" | "bullets" | "write";
+
+export const APPROACHES: {
+  id: LongFormApproach;
+  label: string;
+  blurb: string;
+  /** What the agent asks for next. */
+  ask: string;
+  placeholder: string;
+  /** The button that ends the exchange. */
+  cta: string;
+  /** How long the stub pretends to work. Pasting is not writing. */
+  delay: number;
+}[] = [
+  {
+    id: "paste",
+    label: "I've already written it",
+    blurb: "Use my words as they are",
+    ask: "Paste it in and I'll set it on the card exactly as you wrote it.",
+    placeholder: "Paste your text…",
+    cta: "Place it",
+    delay: 500,
+  },
+  {
+    id: "polish",
+    label: "Help me polish it",
+    blurb: "I have a draft, tidy it up",
+    ask: "Paste your draft. I'll keep your voice and fix the rest — spelling, rhythm, the bits that run on.",
+    placeholder: "Paste your draft…",
+    cta: "Polish it",
+    delay: 1800,
+  },
+  {
+    id: "bullets",
+    label: "I'll give you the bullets",
+    blurb: "You turn them into prose",
+    ask: "Give me the beats — one per line. Names, dates, the thing everyone will remember.",
+    placeholder: "Moved house in March\nDog finally likes the stairs\nJune, the rain, all of us laughing",
+    cta: "Write it up",
+    delay: 2400,
+  },
+  {
+    id: "write",
+    label: "You write it",
+    blurb: "I'll tell you about them",
+    ask: "Tell me who it's for and what you want them to feel. A sentence is plenty.",
+    placeholder: "For my sister, who just finished nursing school…",
+    cta: "Write it for me",
+    delay: 2800,
+  },
+];
+
+export function findApproach(id: LongFormApproach | null) {
+  return APPROACHES.find((a) => a.id === id) ?? null;
+}
+
+/* ----------------------------------------------------------- fitting to fit */
+
+/**
+ * Long-form copy is set to fill the box it was given rather than to a fixed
+ * size — a paragraph in a small box is small type, the same paragraph in a big
+ * one is big. Resize the box and the text refits.
+ *
+ * Measured by estimate rather than by the canvas: this runs on every drag
+ * frame, and a metrics call per candidate size would cost more than the
+ * accuracy is worth.
+ */
+const AVG_GLYPH = 0.5;
+
+function estimateHeight(
+  text: string,
+  width: number,
+  size: number,
+  lineHeight: number,
+) {
+  const perLine = Math.max(1, Math.floor(width / (size * AVG_GLYPH)));
+  let lines = 0;
+  for (const paragraph of text.split("\n")) {
+    lines += Math.max(1, Math.ceil(paragraph.length / perLine));
+  }
+  return lines * size * lineHeight;
+}
+
+export function fitFontSize(
+  text: string,
+  width: number,
+  height: number,
+  lineHeight = 1.5,
+  { min = 14, max = 110 } = {},
+) {
+  if (!text.trim() || width <= 0 || height <= 0) return min;
+  for (let size = max; size > min; size -= 1) {
+    if (estimateHeight(text, width, size, lineHeight) <= height) return size;
+  }
+  return min;
+}

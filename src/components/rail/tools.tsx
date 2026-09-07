@@ -1,6 +1,7 @@
 import {
   CalendarHeart,
   Frame,
+  Smile,
   ImagePlay,
   MapPin,
   Printer,
@@ -37,6 +38,12 @@ export const TOOLS: ToolDef[] = [
     label: "Styles",
     icon: Shapes,
     blurb: "Swap the look of this card — art direction, palette, and vibe.",
+  },
+  {
+    id: "stickers",
+    label: "Stickers",
+    icon: Smile,
+    blurb: "Drop something on the card and move it about.",
   },
   {
     id: "event",

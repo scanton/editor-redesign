@@ -1,7 +1,13 @@
 "use client";
 
 import { motion } from "motion/react";
-import { useRef, type PointerEvent as ReactPointerEvent } from "react";
+import {
+  useId,
+  useRef,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { springBouncy } from "@/lib/motion";
 import { cardTransform, toCardPoint, toScreenRect } from "@/lib/card-transform";
 import { CUT_SAFE_MARGIN, PX_PER_INCH, safeArea } from "@/lib/long-form";
@@ -34,6 +40,8 @@ export function PlacementLayer({
   onCommit,
   label,
   showTrimNote = true,
+  dim = false,
+  actions,
 }: {
   viewport: { width: number; height: number };
   rect: AnnotationRect;
@@ -41,11 +49,23 @@ export function PlacementLayer({
   onCommit?: (rect: AnnotationRect) => void;
   label: string;
   showTrimNote?: boolean;
+  /**
+   * Dim the artwork outside the box. Card art is loud by design, and a block
+   * of copy sitting on top of it is hard to read until everything else steps
+   * back.
+   */
+  dim?: boolean;
+  /** Shown under the box once it is clicked, for whatever the block can do. */
+  actions?: ReactNode;
 }) {
   const face = useEditorStore((s) => s.doc.faces[s.face]);
   const zoom = useEditorStore((s) => s.zoom);
 
   const hostRef = useRef<HTMLDivElement>(null);
+  const maskId = useId();
+  // Clicking the box asks for its actions; dragging it does not.
+  const [picked, setPicked] = useState(false);
+  const movedRef = useRef(false);
   const dragRef = useRef<{
     mode: "move" | Handle;
     origin: { x: number; y: number };
@@ -71,6 +91,7 @@ export function PlacementLayer({
     try {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
     } catch {}
+    movedRef.current = false;
     dragRef.current = { mode, origin: pointIn(e), start: { ...rect } };
   };
 
@@ -80,6 +101,7 @@ export function PlacementLayer({
     const now = pointIn(e);
     const dx = now.x - drag.origin.x;
     const dy = now.y - drag.origin.y;
+    if (Math.abs(dx) > 2 || Math.abs(dy) > 2) movedRef.current = true;
     const next = resize(drag.mode, drag.start, dx, dy, safe);
     latestRef.current = next;
     onChange(next);
@@ -88,13 +110,39 @@ export function PlacementLayer({
   const end = () => {
     if (!dragRef.current) return;
     dragRef.current = null;
+    // A press that never moved is a click, and a click is asking for options.
+    if (!movedRef.current) setPicked((p) => !p);
     // The last pointermove may not have re-rendered yet, so commit from the ref
     // rather than the render closure.
     onCommit?.(latestRef.current ?? rect);
   };
 
   return (
-    <div ref={hostRef} className="pointer-events-none absolute inset-0 z-10">
+    // Above the region layer: in Element mode that layer takes the whole
+    // canvas so segments stay hoverable, which would otherwise swallow every
+    // click meant for this box. The layer itself passes pointers through —
+    // only the box and its handles catch them.
+    <div ref={hostRef} className="pointer-events-none absolute inset-0 z-[25]">
+      {dim && (
+        <svg className="absolute inset-0 h-full w-full">
+          <defs>
+            <mask id={maskId}>
+              <rect width="100%" height="100%" fill="white" />
+              <rect {...boxAttrs(box)} rx={6} fill="black" />
+            </mask>
+          </defs>
+          <motion.rect
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.2 }}
+            width="100%"
+            height="100%"
+            fill="rgb(16 16 20 / 0.55)"
+            mask={`url(#${maskId})`}
+          />
+        </svg>
+      )}
+
       {/* Trim-safe boundary, so the constraint is visible rather than implied.
           Card art is arbitrary, so the guide carries its own contrast. */}
       <div
@@ -131,6 +179,18 @@ export function PlacementLayer({
         <span className="absolute -top-7 left-0 whitespace-nowrap rounded-full bg-brand-red px-2.5 py-1 text-[11px] font-semibold text-white">
           {label}
         </span>
+
+        {actions && picked && (
+          <motion.div
+            initial={{ opacity: 0, y: -6, scale: 0.96 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            transition={springBouncy}
+            onPointerDown={(e) => e.stopPropagation()}
+            className="absolute left-1/2 top-full mt-3 -translate-x-1/2 cursor-default"
+          >
+            {actions}
+          </motion.div>
+        )}
 
         {HANDLES.map((handle) => (
           <span
@@ -207,4 +267,14 @@ function resize(
   }
 
   return { x, y, width, height };
+}
+
+/** The box in SVG attribute form, for the dimming mask. */
+function boxAttrs(box: {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}) {
+  return { x: box.left, y: box.top, width: box.width, height: box.height };
 }
