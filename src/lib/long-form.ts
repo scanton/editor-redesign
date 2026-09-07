@@ -390,3 +390,62 @@ export function fitFontSize(
   }
   return min;
 }
+
+/* ------------------------------------------------------------- the frame */
+
+/**
+ * What to do with the artwork under a frame. The panel has to come from
+ * somewhere, and there is no single right answer: laying it on top is quick
+ * and keeps the art intact, moving the art around it keeps both, and clearing
+ * the space under it is the surest way to be read. That is a decision about
+ * someone's card, so the agent asks rather than picks.
+ */
+export type FrameTreatment = "overlay" | "blend" | "rearrange" | "clear";
+
+export const FRAME_TREATMENTS: {
+  id: FrameTreatment;
+  label: string;
+  blurb: string;
+  /** The stub's panel fill, so the four read differently on the card. */
+  fill: string;
+  /** What the panel says afterwards. */
+  done: string;
+  delay: number;
+}[] = [
+  {
+    id: "overlay",
+    label: "Set it on top",
+    blurb: "Quickest. The artwork stays exactly as it is, under the panel.",
+    fill: "rgba(250,248,243,0.86)",
+    done: "The panel sits on the artwork, which is untouched underneath.",
+    delay: 1400,
+  },
+  {
+    id: "blend",
+    label: "Blend it into the art",
+    blurb: "The panel is worked into the design, so it reads as drawn there.",
+    fill: "rgba(250,248,243,0.72)",
+    done: "The panel was worked into the artwork rather than laid over it.",
+    delay: 2800,
+  },
+  {
+    id: "rearrange",
+    label: "Move the art around it",
+    blurb: "Nothing important ends up underneath. Keeps every piece of the art.",
+    fill: "rgba(250,248,243,0.92)",
+    done: "The artwork was re-laid so nothing important sits under the words.",
+    delay: 3400,
+  },
+  {
+    id: "clear",
+    label: "Clear the space",
+    blurb: "The art under the panel goes. The easiest to read, the least busy.",
+    fill: "#faf8f3",
+    done: "The artwork under the panel was cleared.",
+    delay: 2200,
+  },
+];
+
+export function findFrameTreatment(id: FrameTreatment | null) {
+  return FRAME_TREATMENTS.find((t) => t.id === id) ?? null;
+}

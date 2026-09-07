@@ -24,9 +24,11 @@ import { SWITCHER_INSET, TOOLBAR_INSET } from "@/lib/card-transform";
 import {
   defaultLongFormRect,
   findApproach,
+  findFrameTreatment,
   findLongForm,
   fitFontSize,
   sampleFor,
+  type FrameTreatment,
   type LongFormApproach,
   type LongFormLength,
 } from "@/lib/long-form";
@@ -75,15 +77,19 @@ export const LONG_FORM_FRAME_ID = "long_form_frame";
 /** Leading for long-form copy, shared by the fitter and the node. */
 const LONG_FORM_LEADING = 1.45;
 
-/** The frame geometry for a placement box — a little larger than the words. */
-function framePanel(rect: AnnotationRect) {
+/**
+ * The frame geometry for a placement box — a little larger than the words.
+ * Each treatment paints it differently, so the four choices are told apart on
+ * the card rather than only in the panel.
+ */
+function framePanel(rect: AnnotationRect, treatment: FrameTreatment | null) {
   const pad = 26;
   return {
     x: rect.x - pad,
     y: rect.y - pad,
     width: rect.width + pad * 2,
     height: rect.height + pad * 2,
-    fill: "rgba(250,248,243,0.9)",
+    fill: findFrameTreatment(treatment)?.fill ?? "rgba(250,248,243,0.86)",
     cornerRadius: 20,
   };
 }
@@ -349,8 +355,12 @@ type EditorState = {
      * A panel rendered into the artwork behind the words. Copy set straight
      * onto a busy render is often unreadable, and this is the fix the agent
      * offers rather than one it applies unasked.
+     *
+     * "asking" is the agent putting the question of what happens to the
+     * artwork underneath — a decision about someone's card, not ours.
      */
-    frame: "none" | "rendering" | "placed";
+    frame: "none" | "asking" | "rendering" | "placed";
+    frameTreatment: FrameTreatment | null;
   };
   setLongForm: (patch: Partial<EditorState["longForm"]>) => void;
   resetLongFormPlacement: () => void;
@@ -359,8 +369,13 @@ type EditorState = {
   requestLongForm: () => void;
   /** Keep the copy filling its box as the box is dragged and resized. */
   refitLongForm: (rect: AnnotationRect, commit?: boolean) => void;
-  /** Re-render the artwork with a panel behind the words, or take it away. */
+  /**
+   * Ask for a frame, or take away the one that is there. Asking does not
+   * render — the agent puts the question of the artwork underneath first.
+   */
   renderLongFormFrame: () => void;
+  /** Answer that question, which is what actually starts the render. */
+  renderFrameAs: (treatment: FrameTreatment) => void;
   /** Colour and face for the block, applied to the copy already on the card. */
   setLongFormStyle: (patch: { fill?: string; fontFamily?: string }) => void;
   /** Take the block off the card and start the writing over. */
@@ -1179,6 +1194,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     fill: "#16161a",
     fontFamily: "DM Sans",
     frame: "none",
+    frameTreatment: null,
   },
   setLongForm: (patch) =>
     set((s) => ({ longForm: { ...s.longForm, ...patch } })),
@@ -1268,7 +1284,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       // The frame was drawn around the box, so it follows the box.
       const frame = face.nodes.find((n) => n.id === LONG_FORM_FRAME_ID);
-      if (frame && frame.kind === "shape") Object.assign(frame, framePanel(rect));
+      if (frame && frame.kind === "shape")
+        Object.assign(frame, framePanel(rect, s.longForm.frameTreatment));
 
       return {
         doc,
@@ -1308,7 +1325,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: [...s.past, cloneDoc(s.doc)].slice(-MAX_HISTORY),
         future: [],
         editingLongForm: false,
-        longForm: { ...s.longForm, status: "idle", frame: "none", draft: "" },
+        longForm: {
+          ...s.longForm,
+          status: "idle",
+          frame: "none",
+          frameTreatment: null,
+          draft: "",
+        },
       };
     }),
 
@@ -1368,14 +1391,33 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const doc = cloneDoc(get().doc);
       const face = doc.faces[longForm.face];
       face.nodes = face.nodes.filter((n) => n.id !== LONG_FORM_FRAME_ID);
-      set({ doc, longForm: { ...longForm, frame: "none" } });
+      set({
+        doc,
+        longForm: { ...longForm, frame: "none", frameTreatment: null },
+      });
       return;
     }
 
-    set({ longForm: { ...longForm, frame: "rendering" } });
+    // Asking is a toggle too, so the same button backs out of the question.
+    if (longForm.frame === "asking") {
+      set({ longForm: { ...longForm, frame: "none" } });
+      return;
+    }
 
-    // Stub — the real thing re-renders the panel with the artwork worked
-    // around a cleared area, rather than laying a shape over the top of it.
+    // What happens to the artwork underneath is the customer's call, so the
+    // agent puts the question before anything is rendered.
+    set({ longForm: { ...longForm, frame: "asking" }, agentOpen: true });
+  },
+
+  renderFrameAs: (treatment) => {
+    const { longForm } = get();
+    if (longForm.frame !== "asking") return;
+    set({
+      longForm: { ...longForm, frame: "rendering", frameTreatment: treatment },
+    });
+
+    // Stub — the real thing re-renders the panel with the artwork handled the
+    // way they asked, rather than laying a shape over the top of it.
     window.setTimeout(() => {
       const state = get();
       const doc = cloneDoc(state.doc);
@@ -1389,7 +1431,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         shape: "rect",
         rotation: 0,
         opacity: 1,
-        ...framePanel(state.longForm.rect),
+        ...framePanel(state.longForm.rect, treatment),
       };
       // Behind the words, so it goes in ahead of them.
       const index = face.nodes.findIndex((n) => n.id === LONG_FORM_NODE_ID);
@@ -1401,7 +1443,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         future: [],
         longForm: { ...state.longForm, frame: "placed" },
       });
-    }, 2000);
+    }, findFrameTreatment(treatment)?.delay ?? 2000);
   },
 
   commit: () =>

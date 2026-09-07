@@ -29,6 +29,7 @@ import {
   LENGTHS,
   LONG_FORM_GROUPS,
   PX_PER_INCH,
+  findFrameTreatment,
   findLongForm,
   type LongFormLength,
 } from "@/lib/long-form";
@@ -252,9 +253,13 @@ function SetIn() {
 function FrameControl() {
   const status = useEditorStore((s) => s.longForm.status);
   const frame = useEditorStore((s) => s.longForm.frame);
+  const treatment = useEditorStore((s) =>
+    findFrameTreatment(s.longForm.frameTreatment),
+  );
   const render = useEditorStore((s) => s.renderLongFormFrame);
 
   const busy = frame === "rendering";
+  const asking = frame === "asking";
   const on = frame === "placed";
   const ready = status === "placed";
 
@@ -266,6 +271,8 @@ function FrameControl() {
             <Loader2 size={16} className="animate-spin" />
           ) : on ? (
             <Square size={16} />
+          ) : asking ? (
+            <MessageCircle size={16} />
           ) : (
             <SquareDashed size={16} />
           )}
@@ -273,15 +280,20 @@ function FrameControl() {
             ? "Re-rendering the panel…"
             : on
               ? "Remove the frame"
-              : "Render a frame behind this"}
+              : asking
+                ? "Never mind"
+                : "Render a frame behind this"}
         </span>
       </PrimaryButton>
       <p className="mt-2 text-center text-[11.5px] leading-snug text-ink-faint">
         {!ready
           ? "Write something first — a frame needs words to sit behind."
-          : on
-            ? "The artwork was re-rendered with a panel behind the words."
-            : "The shading on the card now is only for reading. A frame is rendered into the artwork and stays."}
+          : asking
+            ? "Stampy is asking what to do with the artwork underneath."
+            : on
+              ? (treatment?.done ??
+                "The artwork was re-rendered with a panel behind the words.")
+              : "The shading on the card now is only for reading. A frame is rendered into the artwork and stays."}
       </p>
     </>
   );
