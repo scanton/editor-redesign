@@ -33,7 +33,9 @@ export function LongFormThread({ avatar }: { avatar: React.ReactNode }) {
   if (!option) return null;
 
   const writing = longForm.status === "writing";
-  const placed = longForm.status === "placed";
+  // Whether *this* exchange has produced its words — not whether the card has
+  // any, which it may well have from something else entirely.
+  const wrote = !!approach && longForm.wroteWith === longForm.approach;
 
   return (
     <div className="flex flex-col gap-4">
@@ -93,7 +95,7 @@ export function LongFormThread({ avatar }: { avatar: React.ReactNode }) {
           <Turn avatar={avatar}>
             <p className="text-[14px] leading-snug text-ink">{approach.ask}</p>
 
-            {!placed && (
+            {!wrote && (
               <DraftBox
                 value={longForm.draft}
                 onChange={(draft) => setLongForm({ draft })}
@@ -104,7 +106,7 @@ export function LongFormThread({ avatar }: { avatar: React.ReactNode }) {
               />
             )}
 
-            {placed && (
+            {wrote && (
               <motion.p
                 initial={{ opacity: 0, y: 6 }}
                 animate={{ opacity: 1, y: 0 }}
