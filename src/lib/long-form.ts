@@ -349,9 +349,31 @@ function estimateHeight(
 ) {
   const perLine = Math.max(1, Math.floor(width / (size * AVG_GLYPH)));
   let lines = 0;
+
   for (const paragraph of text.split("\n")) {
-    lines += Math.max(1, Math.ceil(paragraph.length / perLine));
+    const words = paragraph.trim().split(/\s+/).filter(Boolean);
+    if (words.length === 0) {
+      lines += 1;
+      continue;
+    }
+    // Wrap the way text actually wraps — at word boundaries. Counting
+    // characters instead treats every line as perfectly full, which
+    // undercounts the lines a short phrase really takes and lets the block
+    // overflow its box.
+    let used = 0;
+    let count = 1;
+    for (const word of words) {
+      const needed = used === 0 ? word.length : word.length + 1;
+      if (used + needed > perLine && used > 0) {
+        count += 1;
+        used = word.length;
+      } else {
+        used += needed;
+      }
+    }
+    lines += count;
   }
+
   return lines * size * lineHeight;
 }
 

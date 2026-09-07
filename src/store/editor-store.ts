@@ -365,6 +365,14 @@ type EditorState = {
   setLongFormStyle: (patch: { fill?: string; fontFamily?: string }) => void;
   /** Take the block off the card and start the writing over. */
   deleteLongForm: () => void;
+  /**
+   * Editing the words in place. The agent's draft is a starting point, not a
+   * verdict — and someone who already has their text should be able to put it
+   * straight into the block rather than round-tripping through the dock.
+   */
+  editingLongForm: boolean;
+  setEditingLongForm: (editing: boolean) => void;
+  setLongFormText: (text: string) => void;
 
   commit: () => void;
   undo: () => void;
@@ -1299,7 +1307,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         doc,
         past: [...s.past, cloneDoc(s.doc)].slice(-MAX_HISTORY),
         future: [],
+        editingLongForm: false,
         longForm: { ...s.longForm, status: "idle", frame: "none", draft: "" },
+      };
+    }),
+
+  editingLongForm: false,
+  setEditingLongForm: (editingLongForm) => set({ editingLongForm }),
+
+  // Typing into an empty box is a way of starting, so this makes the block if
+  // there isn't one yet rather than refusing until the agent has been asked.
+  setLongFormText: (text) =>
+    set((s) => {
+      const doc = cloneDoc(s.doc);
+      const face = doc.faces[s.longForm.face];
+      const rect = s.longForm.rect;
+      const existing = face.nodes.find((n) => n.id === LONG_FORM_NODE_ID);
+
+      if (existing && existing.kind === "text") {
+        existing.text = text;
+        existing.fontSize = fitFontSize(
+          text,
+          rect.width,
+          rect.height,
+          LONG_FORM_LEADING,
+        );
+      } else {
+        face.nodes.push({
+          id: LONG_FORM_NODE_ID,
+          kind: "text",
+          name: findLongForm(s.longForm.kind)?.label ?? "Long-form text",
+          text,
+          x: rect.x,
+          y: rect.y,
+          width: rect.width,
+          fontSize: fitFontSize(text, rect.width, rect.height, LONG_FORM_LEADING),
+          fontFamily: s.longForm.fontFamily,
+          fontStyle: "normal",
+          fill: s.longForm.fill,
+          align: "left",
+          lineHeight: LONG_FORM_LEADING,
+          letterSpacing: 0,
+          rotation: 0,
+          opacity: 1,
+        });
+      }
+
+      return {
+        doc,
+        longForm: { ...s.longForm, status: "placed" as const },
       };
     }),
 

@@ -1,5 +1,6 @@
 "use client";
 
+import { LongFormEditor } from "@/components/canvas/long-form-editor";
 import { PlacementLayer } from "@/components/canvas/placement-layer";
 import { findLongForm } from "@/lib/long-form";
 import {
@@ -25,6 +26,8 @@ export function PlacementLayers({
 
   const longForm = useEditorStore((s) => s.longForm);
   const longFormActive = useEditorStore(longFormBoxActive);
+  const editing = useEditorStore((s) => s.editingLongForm);
+  const setEditing = useEditorStore((s) => s.setEditingLongForm);
   const refitLongForm = useEditorStore((s) => s.refitLongForm);
   const updateNode = useEditorStore((s) => s.updateNode);
   const signature = useNode<DrawNode>("inside_signature");
@@ -40,18 +43,23 @@ export function PlacementLayers({
   if (marking) return null;
 
   if (longFormActive) {
+    // Typing takes the whole box, so the editor replaces the handles rather
+    // than fighting them for the pointer.
+    if (editing) return <LongFormEditor viewport={viewport} />;
+
     const option = findLongForm(longForm.kind);
     return (
       <PlacementLayer
         viewport={viewport}
         rect={longForm.rect}
-        label={option?.label ?? "Long-form text"}
+        label={`${option?.label ?? "Long-form text"} · double-click to edit`}
         // The artwork steps back so the block can be read against it.
         dim
         // Refit as it moves, so the type is always filling the box rather than
         // snapping to size when you let go.
         onChange={(rect) => refitLongForm(rect)}
         onCommit={(rect) => refitLongForm(rect, longForm.status === "placed")}
+        onActivate={() => setEditing(true)}
       />
     );
   }

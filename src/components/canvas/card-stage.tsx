@@ -53,6 +53,10 @@ export default function CardStage({ width, height }: Props) {
         : null,
   );
 
+  // While the block is being typed into, the textarea above is showing the
+  // words; drawing them here too would double them.
+  const editing = useEditorStore((s) => s.editingLongForm);
+
   const resolveFont = useFontFamilies();
   const transform = cardTransform({ width, height }, face, zoom);
 
@@ -108,7 +112,11 @@ export default function CardStage({ width, height }: Props) {
                   listening={false}
                 />
               )}
-              <NodeView node={node} resolveFont={resolveFont} corner={corner} />
+              {/* The textarea standing over the box is showing these words
+                  already; drawing them here as well would double them. */}
+              {!(editing && node.id === LONG_FORM_NODE_ID) && (
+                <NodeView node={node} resolveFont={resolveFont} corner={corner} />
+              )}
             </Fragment>
           ))}
 
