@@ -18,6 +18,7 @@ import { useState } from "react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { springBouncy, springHeavy, staggerChild } from "@/lib/motion";
+import { FrameThread } from "@/components/agent/frame-thread";
 import { LongFormThread } from "@/components/agent/long-form-thread";
 import type { AnnotationRequest, Product } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
@@ -112,6 +113,8 @@ export function AgentDock() {
             </motion.div>
 
             {longFormKind && <LongFormThread avatar={<AgentAvatar />} />}
+
+            <FrameThread avatar={<AgentAvatar />} />
 
             {requests.map((request) => (
               <AnnotationMessage key={request.id} request={request} />
