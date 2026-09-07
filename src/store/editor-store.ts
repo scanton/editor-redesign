@@ -306,11 +306,19 @@ type EditorState = {
   selectedSticker: string | null;
   setSelectedSticker: (id: string | null) => void;
   addSticker: (stickerId: string) => void;
+  /** A sticker of their own. `src` is a data URL for the demo. */
+  addUploadedSticker: (src: string, label: string) => void;
   /** Stub: the agent renders one from a description. */
   stickerPrompt: string;
   setStickerPrompt: (prompt: string) => void;
   makingSticker: boolean;
   makeSticker: () => void;
+  /**
+   * Remove whatever the open panel has picked out on the card. One action for
+   * both, because from the canvas it is one gesture: the trash acts on the
+   * selection, whatever the selection happens to be.
+   */
+  deleteSelection: () => void;
 
   /** Translations: pick a target language, agent re-renders every face. */
   targetLanguage: string | null;
@@ -334,6 +342,9 @@ type EditorState = {
     face: FaceId;
     rect: AnnotationRect;
     status: "idle" | "writing" | "placed";
+    /** How the words are set. */
+    fill: string;
+    fontFamily: string;
     /**
      * A panel rendered into the artwork behind the words. Copy set straight
      * onto a busy render is often unreadable, and this is the fix the agent
@@ -350,6 +361,10 @@ type EditorState = {
   refitLongForm: (rect: AnnotationRect, commit?: boolean) => void;
   /** Re-render the artwork with a panel behind the words, or take it away. */
   renderLongFormFrame: () => void;
+  /** Colour and face for the block, applied to the copy already on the card. */
+  setLongFormStyle: (patch: { fill?: string; fontFamily?: string }) => void;
+  /** Take the block off the card and start the writing over. */
+  deleteLongForm: () => void;
 
   commit: () => void;
   undo: () => void;
@@ -372,6 +387,7 @@ function placeSticker(
   stickerId: string,
   glyph: string,
   label: string,
+  src?: string,
 ) {
   const doc = cloneDoc(state.doc);
   const face = doc.faces[state.face];
@@ -385,6 +401,7 @@ function placeSticker(
     name: label,
     stickerId,
     glyph,
+    src,
     label,
     size,
     x: (face.width - size) / 2 - size * 0.6 + drift,
@@ -1086,6 +1103,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     set(placeSticker(state, sticker.id, sticker.glyph, sticker.label));
   },
 
+  addUploadedSticker: (src, label) =>
+    set(placeSticker(get(), "uploaded", "", label, src)),
+
+  deleteSelection: () => {
+    const { activeTool, selectedSticker } = get();
+    if (activeTool === "stickers" && selectedSticker) {
+      get().removeNode(selectedSticker);
+      set({ selectedSticker: null });
+      return;
+    }
+    if (activeTool === "longform") get().deleteLongForm();
+  },
+
   stickerPrompt: "",
   setStickerPrompt: (stickerPrompt) => set({ stickerPrompt }),
   makingSticker: false,
@@ -1115,6 +1145,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     face: "inside",
     rect: defaultLongFormRect(),
     status: "idle",
+    fill: "#f7f0dd",
+    fontFamily: "DM Sans",
     frame: "none",
   },
   setLongForm: (patch) =>
@@ -1161,9 +1193,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         width: rect.width,
         // Set to fill the box it was given rather than to a fixed size.
         fontSize: fitFontSize(text, rect.width, rect.height, LONG_FORM_LEADING),
-        fontFamily: "DM Sans",
+        fontFamily: state.longForm.fontFamily,
         fontStyle: "normal",
-        fill: "#f7f0dd",
+        fill: state.longForm.fill,
         align: "left",
         lineHeight: LONG_FORM_LEADING,
         letterSpacing: 0,
@@ -1213,6 +1245,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         ...(commit
           ? { past: [...s.past, cloneDoc(s.doc)].slice(-MAX_HISTORY), future: [] }
           : {}),
+      };
+    }),
+
+  setLongFormStyle: (patch) =>
+    set((s) => {
+      const doc = cloneDoc(s.doc);
+      const node = doc.faces[s.longForm.face].nodes.find(
+        (n) => n.id === LONG_FORM_NODE_ID,
+      );
+      if (node && node.kind === "text") Object.assign(node, patch);
+      return {
+        doc,
+        longForm: { ...s.longForm, ...patch },
+        past: [...s.past, cloneDoc(s.doc)].slice(-MAX_HISTORY),
+        future: [],
+      };
+    }),
+
+  // Taking the words off also takes off the frame that was rendered for them,
+  // and puts the writing back to the question the agent started with.
+  deleteLongForm: () =>
+    set((s) => {
+      const doc = cloneDoc(s.doc);
+      const face = doc.faces[s.longForm.face];
+      face.nodes = face.nodes.filter(
+        (n) => n.id !== LONG_FORM_NODE_ID && n.id !== LONG_FORM_FRAME_ID,
+      );
+      return {
+        doc,
+        past: [...s.past, cloneDoc(s.doc)].slice(-MAX_HISTORY),
+        future: [],
+        longForm: { ...s.longForm, status: "idle", frame: "none", draft: "" },
       };
     }),
 

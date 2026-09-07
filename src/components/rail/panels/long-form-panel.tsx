@@ -1,13 +1,26 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Check, MessageCircle, Move, RotateCcw } from "lucide-react";
+import {
+  Check,
+  Loader2,
+  MessageCircle,
+  Move,
+  RotateCcw,
+  Square,
+  SquareDashed,
+} from "lucide-react";
 import { useEffect } from "react";
 import {
+  ColorWheelButton,
+  Field,
   PanelBody,
   Section,
   Segmented,
+  Select,
+  SwatchGrid,
 } from "@/components/rail/panels/parts";
+import { CARD_FONTS, RECOMMENDED_COLORS, fontCssVar } from "@/lib/fonts";
 import { springBouncy, springTight, staggerParent } from "@/lib/motion";
 import {
   CUT_SAFE_MARGIN,
@@ -25,6 +38,13 @@ import { cn } from "@/lib/utils";
  * not here — picking a kind hands the question to the agent, because "who is
  * doing the writing" is a conversation, not a setting.
  */
+const FONT_OPTIONS = CARD_FONTS.map((f) => ({
+  value: f.id,
+  label: f.label,
+  sample: "Aa",
+  fontFamily: f.cssVar,
+}));
+
 export function LongFormPanel() {
   const longForm = useEditorStore((s) => s.longForm);
   const setLongForm = useEditorStore((s) => s.setLongForm);
@@ -111,6 +131,8 @@ export function LongFormPanel() {
           </Section>
         )}
 
+        {longForm.status === "placed" && <SetIn />}
+
         <Section title="Length">
           <Segmented
             id="long-form-length"
@@ -155,8 +177,93 @@ export function LongFormPanel() {
               edge so nothing is lost when the card is cut.
             </p>
           </div>
+
+          {longForm.status === "placed" && <FrameControl />}
         </Section>
       </motion.div>
     </PanelBody>
+  );
+}
+
+/** Colour and face for the block, once there is a block to set. */
+function SetIn() {
+  const fill = useEditorStore((s) => s.longForm.fill);
+  const fontFamily = useEditorStore((s) => s.longForm.fontFamily);
+  const setStyle = useEditorStore((s) => s.setLongFormStyle);
+
+  return (
+    <Section title="Set in">
+      <Field label="Typeface">
+        <Select
+          options={FONT_OPTIONS}
+          value={fontFamily}
+          onChange={(next) => setStyle({ fontFamily: next })}
+        />
+      </Field>
+
+      <Field label="Colour">
+        <div className="flex items-start gap-3">
+          <ColorWheelButton color={fill} />
+          <div className="min-w-0 flex-1">
+            <SwatchGrid
+              colors={RECOMMENDED_COLORS}
+              value={fill}
+              onChange={(next) => setStyle({ fill: next })}
+            />
+          </div>
+        </div>
+      </Field>
+
+      <p
+        className="mt-1 rounded-[12px] px-3 py-2.5 text-[15px] leading-snug"
+        style={{ fontFamily: fontCssVar(fontFamily), color: fill, background: "#2a2a2e" }}
+      >
+        The quick brown fox, set the way it will print.
+      </p>
+    </Section>
+  );
+}
+
+/**
+ * The frame the agent renders behind the words. Offered here as well as on the
+ * card itself, because it is a fix for a legibility problem you notice while
+ * reading the panel, not only while looking at the canvas.
+ */
+function FrameControl() {
+  const frame = useEditorStore((s) => s.longForm.frame);
+  const render = useEditorStore((s) => s.renderLongFormFrame);
+  const busy = frame === "rendering";
+  const on = frame === "placed";
+
+  return (
+    <div className="mt-2.5">
+      <motion.button
+        type="button"
+        onClick={render}
+        disabled={busy}
+        whileHover={busy ? undefined : { scale: 1.01 }}
+        whileTap={busy ? undefined : { scale: 0.99 }}
+        transition={springTight}
+        className="flex w-full items-center justify-center gap-2 rounded-full border border-hairline px-3 py-2.5 text-[13px] font-semibold text-ink hover:border-hairline-strong disabled:opacity-60"
+      >
+        {busy ? (
+          <Loader2 size={15} className="animate-spin text-brand-red" />
+        ) : on ? (
+          <Square size={15} className="text-brand-red" />
+        ) : (
+          <SquareDashed size={15} className="text-ink-soft" />
+        )}
+        {busy
+          ? "Re-rendering the panel…"
+          : on
+            ? "Remove the frame"
+            : "Render a frame behind this"}
+      </motion.button>
+      <p className="mt-2 text-[12px] leading-snug text-ink-faint">
+        {on
+          ? "The artwork was re-rendered with a panel behind the words."
+          : "The shading you see now is only for reading — it goes when you leave this panel. A frame is rendered into the artwork and stays."}
+      </p>
+    </div>
   );
 }

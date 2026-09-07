@@ -1,10 +1,12 @@
 "use client";
 
 import { motion } from "motion/react";
-import { Loader2, Sparkles, Trash2, Wand2 } from "lucide-react";
+import { useRef, useState } from "react";
+import { Info, Loader2, Sparkles, Trash2, Upload, Wand2 } from "lucide-react";
 import { PanelBody, Section, inputClass } from "@/components/rail/panels/parts";
+import { Tooltip } from "@/components/ui/tooltip";
 import { springBouncy, springTight, staggerParent } from "@/lib/motion";
-import { STICKER_GROUPS } from "@/lib/stickers";
+import { STICKER_GROUPS, UPLOAD_SPEC } from "@/lib/stickers";
 import { useEditorStore } from "@/store/editor-store";
 import type { StickerNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -36,6 +38,7 @@ export function StickersPanel() {
           </p>
         </Section>
 
+        <BringYourOwn />
         <MakeOne />
 
         {placed.length > 0 && <Placed stickers={placed} />}
@@ -66,6 +69,77 @@ export function StickersPanel() {
   );
 }
 
+/**
+ * A sticker of their own. The spec is offered before the file picker rather
+ * than as an error afterwards — the failure people actually hit is a PNG with
+ * no transparency, which only shows up once it is on the card.
+ */
+function BringYourOwn() {
+  const addUploaded = useEditorStore((s) => s.addUploadedSticker);
+  const input = useRef<HTMLInputElement>(null);
+  const [problem, setProblem] = useState<string | null>(null);
+
+  const take = (file: File | undefined) => {
+    if (!file) return;
+    if (file.size > UPLOAD_SPEC.maxBytes) {
+      setProblem("That one is over 5 MB. Try a smaller export.");
+      return;
+    }
+    if (!UPLOAD_SPEC.accept.includes(file.type)) {
+      setProblem("PNG or WebP, so the background can be see-through.");
+      return;
+    }
+    setProblem(null);
+    const reader = new FileReader();
+    reader.onload = () =>
+      addUploaded(String(reader.result), file.name.replace(/\.[^.]+$/, ""));
+    reader.readAsDataURL(file);
+  };
+
+  return (
+    <Section
+      title="Bring your own"
+      action={
+        <Tooltip label={UPLOAD_SPEC.hint} side="left">
+          <span className="flex h-6 w-6 items-center justify-center rounded-full text-ink-faint hover:bg-surface-sunken hover:text-ink">
+            <Info size={14} />
+          </span>
+        </Tooltip>
+      }
+    >
+      <input
+        ref={input}
+        type="file"
+        accept={UPLOAD_SPEC.accept}
+        className="hidden"
+        onChange={(e) => {
+          take(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <motion.button
+        type="button"
+        onClick={() => input.current?.click()}
+        whileHover={{ scale: 1.01, y: -1 }}
+        whileTap={{ scale: 0.99 }}
+        transition={springTight}
+        className="flex w-full items-center justify-center gap-2 rounded-[13px] border border-dashed border-hairline-strong py-3 text-[13px] font-semibold text-ink hover:bg-surface-sunken"
+      >
+        <Upload size={15} className="text-ink-soft" />
+        Upload a sticker
+      </motion.button>
+      <p
+        className={cn(
+          "mt-2 text-[12px] leading-snug",
+          problem ? "text-brand-red" : "text-ink-faint",
+        )}
+      >
+        {problem ?? UPLOAD_SPEC.hint}
+      </p>
+    </Section>
+  );
+}
+
 /** Ask for one that isn't on the shelf. */
 function MakeOne() {
   const prompt = useEditorStore((s) => s.stickerPrompt);
@@ -75,7 +149,7 @@ function MakeOne() {
   const ready = prompt.trim().length > 0 && !making;
 
   return (
-    <Section title="Describe one">
+    <Section title="Create your own">
       <div className="flex items-center gap-2">
         <input
           value={prompt}

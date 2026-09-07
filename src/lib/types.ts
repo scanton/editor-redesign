@@ -118,9 +118,15 @@ export type DrawNode = BaseNode & {
  */
 export type StickerNode = BaseNode & {
   kind: "sticker";
-  /** Catalogue id, or "made" for one the agent rendered from a description. */
+  /**
+   * Catalogue id, "made" for one the agent drew from a description, or
+   * "uploaded" for one they brought themselves.
+   */
   stickerId: string;
+  /** The stand-in glyph, used when there is no bitmap. */
   glyph: string;
+  /** An uploaded or rendered image. A data URL in the demo. */
+  src?: string;
   label: string;
   /** Square, so one number is enough. */
   size: number;

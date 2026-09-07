@@ -15,8 +15,9 @@ import useImage from "use-image";
 import { useFontFamilies } from "@/components/canvas/use-font-families";
 import { cardTransform } from "@/lib/card-transform";
 import { QR_IMAGE, QR_SHAPES, trimRadius } from "@/lib/invitation";
-import type { EditorNode, ImageNode } from "@/lib/types";
-import { useEditorStore } from "@/store/editor-store";
+import { Fragment } from "react";
+import type { EditorNode, ImageNode, StickerNode } from "@/lib/types";
+import { LONG_FORM_NODE_ID, useEditorStore } from "@/store/editor-store";
 
 type Props = { width: number; height: number };
 
@@ -35,6 +36,17 @@ export default function CardStage({ width, height }: Props) {
     s.product === "invitation" && s.cardType === "printed"
       ? trimRadius(s.invitation.trim)
       : 8,
+  );
+  // A reading backdrop while the block is being placed — editor chrome, not
+  // artwork. It goes away when the panel does, and the rendered frame
+  // replaces it for good once the agent has drawn one.
+  const preview = useEditorStore(
+    (s) =>
+      s.activeTool === "longform" &&
+      s.longForm.status === "placed" &&
+      s.longForm.frame !== "placed"
+        ? s.longForm.rect
+        : null,
   );
 
   const resolveFont = useFontFamilies();
@@ -78,12 +90,22 @@ export default function CardStage({ width, height }: Props) {
           />
 
           {face.nodes.map((node) => (
-            <NodeView
-              key={node.id}
-              node={node}
-              resolveFont={resolveFont}
-              corner={corner}
-            />
+            <Fragment key={node.id}>
+              {/* Behind the words rather than over them, which is why it is
+                  drawn here and not in the DOM layer above the canvas. */}
+              {preview && node.id === LONG_FORM_NODE_ID && (
+                <Rect
+                  x={preview.x - 26}
+                  y={preview.y - 26}
+                  width={preview.width + 52}
+                  height={preview.height + 52}
+                  cornerRadius={20}
+                  fill="rgba(18,18,20,0.55)"
+                  listening={false}
+                />
+              )}
+              <NodeView node={node} resolveFont={resolveFont} corner={corner} />
+            </Fragment>
           ))}
 
           {/* Composited onto the finished artwork rather than rendered into
@@ -190,7 +212,9 @@ function NodeView({
   }
 
   if (node.kind === "sticker") {
-    return (
+    return node.src ? (
+      <StickerImage node={node} />
+    ) : (
       <Text
         {...common}
         text={node.glyph}
@@ -302,5 +326,26 @@ function QrNode({ face }: { face: { id: string; width: number; height: number } 
         cornerRadius={Math.max(0, radius - 4) * scale}
       />
     </Group>
+  );
+}
+
+/** A sticker someone brought themselves, fitted into its square. */
+function StickerImage({ node }: { node: StickerNode }) {
+  const [image] = useImage(node.src!);
+  if (!image) return null;
+  // Keep the artwork's own proportions inside the square the box gives it.
+  const scale = Math.min(node.size / image.width, node.size / image.height);
+  const width = image.width * scale;
+  const height = image.height * scale;
+  return (
+    <KonvaImage
+      image={image}
+      x={node.x + (node.size - width) / 2}
+      y={node.y + (node.size - height) / 2}
+      width={width}
+      height={height}
+      rotation={node.rotation}
+      opacity={node.opacity}
+    />
   );
 }

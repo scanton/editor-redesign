@@ -80,3 +80,15 @@ export function glyphForPrompt(prompt: string) {
 
 /** How big a new sticker lands, as a fraction of the panel's short side. */
 export const STICKER_SIZE = 0.22;
+
+/**
+ * What an uploaded sticker should be. Transparency is the part worth saying
+ * out loud — a PNG on a white background prints as a white square, which is
+ * the surprise people actually hit.
+ */
+export const UPLOAD_SPEC = {
+  accept: "image/png,image/webp",
+  maxBytes: 5 * 1024 * 1024,
+  hint: "PNG or WebP with a transparent background. At least 512×512 so it stays sharp in print, and under 5 MB.",
+  short: "PNG, transparent, 512px+",
+};
