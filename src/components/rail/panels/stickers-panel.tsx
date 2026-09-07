@@ -140,7 +140,13 @@ function BringYourOwn() {
   );
 }
 
-/** Ask for one that isn't on the shelf. */
+/**
+ * Ask for one that isn't on the shelf.
+ *
+ * Stubbed — a stand-in glyph fills in for the drawing. That is a note for us,
+ * not for the customer: the line under the field is the one place to tell them
+ * this is here at all, so it says what the feature does.
+ */
 function MakeOne() {
   const prompt = useEditorStore((s) => s.stickerPrompt);
   const setPrompt = useEditorStore((s) => s.setStickerPrompt);
@@ -176,11 +182,13 @@ function MakeOne() {
           )}
         </motion.button>
       </div>
-      <p className="mt-2 flex items-center gap-1.5 text-[12px] text-ink-faint">
-        <Sparkles size={12} />
-        {making
-          ? "Stampy is drawing it…"
-          : "Stub — a stand-in stands in for the agent’s drawing."}
+      <p className="mt-2 flex items-start gap-1.5 text-[12px] leading-snug text-ink-faint">
+        <Sparkles size={12} className="mt-[3px] shrink-0" />
+        <span>
+          {making
+            ? "Stampy is drawing it…"
+            : "Not on the shelf? Describe it and Stampy will draw it — then place it like any other sticker."}
+        </span>
       </p>
     </Section>
   );
