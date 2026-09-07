@@ -31,8 +31,8 @@ export function stepTools(
       ? ["styles", "event", "stickers", "translations"]
       : [
           "styles",
-          "message",
           "longform",
+          "message",
           "signature",
           "stickers",
           "translations",

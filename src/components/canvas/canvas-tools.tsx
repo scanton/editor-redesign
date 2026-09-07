@@ -1,7 +1,13 @@
 "use client";
 
-import { motion } from "motion/react";
-import { Eraser, Highlighter, Scan, SquareDashedMousePointer } from "lucide-react";
+import { AnimatePresence, motion } from "motion/react";
+import {
+  Eraser,
+  Highlighter,
+  Scan,
+  SquareDashedMousePointer,
+  Trash2,
+} from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { CanvasMode } from "@/lib/types";
 import { Tooltip } from "@/components/ui/tooltip";
@@ -51,6 +57,7 @@ const MODES: Mode[] = [
 export function CanvasTools() {
   const active = useEditorStore((s) => s.canvasMode);
   const setMode = useEditorStore((s) => s.setCanvasMode);
+  const selection = useSelection();
 
   return (
     <motion.div
@@ -99,6 +106,59 @@ export function CanvasTools() {
           </Tooltip>
         );
       })}
+
+      {/* The trash joins the toolbar only when there is something to throw
+          away, and names what that is — a bare bin over a card is a threat. */}
+      <AnimatePresence>
+        {selection && (
+          <motion.div
+            initial={{ width: 0, opacity: 0 }}
+            animate={{ width: "auto", opacity: 1 }}
+            exit={{ width: 0, opacity: 0 }}
+            transition={springBouncy}
+            className="flex items-center overflow-hidden"
+          >
+            <span className="mx-1 h-6 w-px shrink-0 bg-hairline" />
+            <Tooltip label={`Delete ${selection.label}`} side="bottom">
+              <motion.button
+                type="button"
+                aria-label={`Delete ${selection.label}`}
+                onClick={selection.remove}
+                whileHover={{ scale: 1.08, y: 2 }}
+                whileTap={{ scale: 0.92 }}
+                transition={springTight}
+                className="flex h-10 w-10 items-center justify-center rounded-[13px] text-ink-soft transition-colors hover:bg-brand-red/10 hover:text-brand-red"
+              >
+                <Trash2 size={18} strokeWidth={1.9} />
+              </motion.button>
+            </Tooltip>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
+}
+
+/**
+ * What the trash would act on. Derived from primitives rather than selected as
+ * an object — a selector that builds one on every read is a new snapshot on
+ * every read, and the store spins.
+ */
+function useSelection() {
+  const tool = useEditorStore((s) => s.activeTool);
+  const stickerId = useEditorStore((s) => s.selectedSticker);
+  const stickerLabel = useEditorStore(
+    (s) =>
+      s.doc.faces[s.face].nodes.find(
+        (n) => n.kind === "sticker" && n.id === s.selectedSticker,
+      )?.name ?? null,
+  );
+  const blockPlaced = useEditorStore((s) => s.longForm.status === "placed");
+  const remove = useEditorStore((s) => s.deleteSelection);
+
+  if (tool === "stickers" && stickerId && stickerLabel)
+    return { label: stickerLabel, remove };
+  if (tool === "longform" && blockPlaced)
+    return { label: "this text", remove };
+  return null;
 }
