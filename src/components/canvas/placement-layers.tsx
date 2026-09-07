@@ -2,7 +2,11 @@
 
 import { PlacementLayer } from "@/components/canvas/placement-layer";
 import { findLongForm } from "@/lib/long-form";
-import { useEditorStore, useNode } from "@/store/editor-store";
+import {
+  longFormBoxActive,
+  useEditorStore,
+  useNode,
+} from "@/store/editor-store";
 import type { DrawNode, StickerNode } from "@/lib/types";
 
 /**
@@ -20,6 +24,7 @@ export function PlacementLayers({
   const face = useEditorStore((s) => s.face);
 
   const longForm = useEditorStore((s) => s.longForm);
+  const longFormActive = useEditorStore(longFormBoxActive);
   const refitLongForm = useEditorStore((s) => s.refitLongForm);
   const updateNode = useEditorStore((s) => s.updateNode);
   const signature = useNode<DrawNode>("inside_signature");
@@ -34,7 +39,7 @@ export function PlacementLayers({
   // Marking up the card takes the pointer; the two must never overlap.
   if (marking) return null;
 
-  if (tool === "longform" && face === longForm.face) {
+  if (longFormActive) {
     const option = findLongForm(longForm.kind);
     return (
       <PlacementLayer

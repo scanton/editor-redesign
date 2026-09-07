@@ -419,6 +419,29 @@ function placeSticker(
   };
 }
 
+/**
+ * Whether the long-form box is in play — on the card, on the face it belongs
+ * to, and grabbable. The reading backdrop drawn behind the words follows this
+ * exactly: it is there to help you place the block, so it belongs on screen
+ * only while the block can be placed, and nowhere else.
+ *
+ * One predicate rather than two matching conditions, because the last time
+ * they were written out separately they drifted — the backdrop stayed behind
+ * on the card after a canvas tool took the box away.
+ */
+export function longFormBoxActive(s: {
+  activeTool: ToolId | null;
+  face: FaceId;
+  canvasMode: CanvasMode;
+  longForm: { face: FaceId };
+}) {
+  return (
+    s.activeTool === "longform" &&
+    s.face === s.longForm.face &&
+    s.canvasMode === "element"
+  );
+}
+
 /** Records a section as passed. Opening it is the visit; nothing is required. */
 function visit(visited: ToolId[], tool: ToolId | null): ToolId[] {
   if (!tool || visited.includes(tool)) return visited;
