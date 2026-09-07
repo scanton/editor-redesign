@@ -83,7 +83,7 @@ function framePanel(rect: AnnotationRect) {
     y: rect.y - pad,
     width: rect.width + pad * 2,
     height: rect.height + pad * 2,
-    fill: "rgba(18,18,20,0.72)",
+    fill: "rgba(250,248,243,0.9)",
     cornerRadius: 20,
   };
 }
@@ -1176,7 +1176,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     face: "inside",
     rect: defaultLongFormRect(),
     status: "idle",
-    fill: "#f7f0dd",
+    fill: "#16161a",
     fontFamily: "DM Sans",
     frame: "none",
   },
