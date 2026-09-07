@@ -35,6 +35,7 @@ export function PlacementLayer({
   label,
   showTrimNote = true,
   dim = false,
+  onActivate,
 }: {
   viewport: { width: number; height: number };
   rect: AnnotationRect;
@@ -48,6 +49,8 @@ export function PlacementLayer({
    * back.
    */
   dim?: boolean;
+  /** Double-clicking the box, for whatever opening it means to the owner. */
+  onActivate?: () => void;
 }) {
   const face = useEditorStore((s) => s.doc.faces[s.face]);
   const zoom = useEditorStore((s) => s.zoom);
@@ -157,6 +160,7 @@ export function PlacementLayer({
         onPointerMove={move}
         onPointerUp={end}
         onPointerCancel={end}
+        onDoubleClick={onActivate}
         className="pointer-events-auto absolute cursor-move rounded-[6px] border-2 border-brand-red bg-brand-red/5"
         style={box}
       >

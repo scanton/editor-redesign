@@ -174,8 +174,9 @@ export function LongFormPanel() {
               on the inside spread
             </p>
             <p className="mt-1.5 text-[12px] leading-snug text-ink-faint">
-              Drag the box on the card to move it, or pull a corner to resize —
-              the type refits as you go. It stays{" "}
+              Drag the box on the card to move it, pull a corner to resize, or
+              double-click to type into it — the words are yours to change, and
+              the type refits whatever you do. It stays{" "}
               {(CUT_SAFE_MARGIN / PX_PER_INCH).toFixed(1)}″ clear of the trim
               edge so nothing is lost when the card is cut.
             </p>
