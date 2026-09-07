@@ -342,6 +342,15 @@ type EditorState = {
     approach: LongFormApproach | null;
     /** Whatever they hand over: finished text, a rough draft, or bullets. */
     draft: string;
+    /**
+     * The approach that produced the words currently on the card, if any.
+     *
+     * Not the same question as whether there are words on the card at all: a
+     * second piece asked for after a first one is a fresh conversation, and so
+     * is asking the agent after typing something in by hand. Reading `status`
+     * for this told every later request it was already finished.
+     */
+    wroteWith: LongFormApproach | null;
     length: LongFormLength;
     /** Set when the draft was lifted off a photo or a document. */
     fileName: string | null;
@@ -1186,6 +1195,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     kind: null,
     approach: null,
     draft: "",
+    wroteWith: null,
     length: "medium",
     fileName: null,
     face: "inside",
@@ -1207,7 +1217,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   // who is doing the writing, which the agent asks in the dock.
   chooseApproach: (approach) =>
     set((s) => ({
-      longForm: { ...s.longForm, approach, draft: "" },
+      // Picking one starts that conversation over, whatever came before it.
+      longForm: { ...s.longForm, approach, draft: "", wroteWith: null },
       agentOpen: true,
     })),
 
@@ -1259,7 +1270,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         doc,
         past: [...state.past, cloneDoc(state.doc)].slice(-MAX_HISTORY),
         future: [],
-        longForm: { ...state.longForm, status: "placed" },
+        longForm: {
+          ...state.longForm,
+          status: "placed",
+          wroteWith: state.longForm.approach,
+        },
       });
     }, approach.delay);
   },
@@ -1331,6 +1346,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           frame: "none",
           frameTreatment: null,
           draft: "",
+          wroteWith: null,
         },
       };
     }),
