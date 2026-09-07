@@ -17,7 +17,11 @@ import { cardTransform } from "@/lib/card-transform";
 import { QR_IMAGE, QR_SHAPES, trimRadius } from "@/lib/invitation";
 import { Fragment } from "react";
 import type { EditorNode, ImageNode, StickerNode } from "@/lib/types";
-import { LONG_FORM_NODE_ID, useEditorStore } from "@/store/editor-store";
+import {
+  LONG_FORM_NODE_ID,
+  longFormBoxActive,
+  useEditorStore,
+} from "@/store/editor-store";
 
 type Props = { width: number; height: number };
 
@@ -38,11 +42,11 @@ export default function CardStage({ width, height }: Props) {
       : 8,
   );
   // A reading backdrop while the block is being placed — editor chrome, not
-  // artwork. It goes away when the panel does, and the rendered frame
+  // artwork. It is on screen only while the box is, and the rendered frame
   // replaces it for good once the agent has drawn one.
   const preview = useEditorStore(
     (s) =>
-      s.activeTool === "longform" &&
+      longFormBoxActive(s) &&
       s.longForm.status === "placed" &&
       s.longForm.frame !== "placed"
         ? s.longForm.rect
