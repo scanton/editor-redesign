@@ -15,6 +15,8 @@ import {
   ColorWheelButton,
   Field,
   PanelBody,
+  PanelFooter,
+  PrimaryButton,
   Section,
   Segmented,
   Select,
@@ -64,8 +66,9 @@ export function LongFormPanel() {
   const inches = (px: number) => (px / PX_PER_INCH).toFixed(1);
 
   return (
-    <PanelBody>
-      <motion.div variants={staggerParent} initial="hidden" animate="visible">
+    <>
+      <PanelBody>
+        <motion.div variants={staggerParent} initial="hidden" animate="visible">
         {LONG_FORM_GROUPS.map((group) => (
           <Section key={group.label} title={group.label}>
             <div className="grid grid-cols-2 gap-2">
@@ -178,10 +181,17 @@ export function LongFormPanel() {
             </p>
           </div>
 
-          {longForm.status === "placed" && <FrameControl />}
         </Section>
-      </motion.div>
-    </PanelBody>
+        </motion.div>
+      </PanelBody>
+
+      {/* The frame is the last decision about the block, and the one people
+          come back for, so it sits where it can always be reached rather than
+          somewhere in the scroll. */}
+      <PanelFooter>
+        <FrameControl />
+      </PanelFooter>
+    </>
   );
 }
 
@@ -225,45 +235,48 @@ function SetIn() {
 }
 
 /**
- * The frame the agent renders behind the words. Offered here as well as on the
- * card itself, because it is a fix for a legibility problem you notice while
- * reading the panel, not only while looking at the canvas.
+ * The frame the agent renders behind the words. It stays in view the whole
+ * time the block is on the card, rather than hiding until something is
+ * clicked — it is the answer to "why can I barely read that", and the moment
+ * you want it is the moment you are looking at the card, not hunting a panel.
+ *
+ * Before there are words it has nothing to sit behind, so it says so instead
+ * of disappearing.
  */
 function FrameControl() {
+  const status = useEditorStore((s) => s.longForm.status);
   const frame = useEditorStore((s) => s.longForm.frame);
   const render = useEditorStore((s) => s.renderLongFormFrame);
+
   const busy = frame === "rendering";
   const on = frame === "placed";
+  const ready = status === "placed";
 
   return (
-    <div className="mt-2.5">
-      <motion.button
-        type="button"
-        onClick={render}
-        disabled={busy}
-        whileHover={busy ? undefined : { scale: 1.01 }}
-        whileTap={busy ? undefined : { scale: 0.99 }}
-        transition={springTight}
-        className="flex w-full items-center justify-center gap-2 rounded-full border border-hairline px-3 py-2.5 text-[13px] font-semibold text-ink hover:border-hairline-strong disabled:opacity-60"
-      >
-        {busy ? (
-          <Loader2 size={15} className="animate-spin text-brand-red" />
-        ) : on ? (
-          <Square size={15} className="text-brand-red" />
-        ) : (
-          <SquareDashed size={15} className="text-ink-soft" />
-        )}
-        {busy
-          ? "Re-rendering the panel…"
+    <>
+      <PrimaryButton disabled={!ready || busy} onClick={render}>
+        <span className="flex items-center justify-center gap-2">
+          {busy ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : on ? (
+            <Square size={16} />
+          ) : (
+            <SquareDashed size={16} />
+          )}
+          {busy
+            ? "Re-rendering the panel…"
+            : on
+              ? "Remove the frame"
+              : "Render a frame behind this"}
+        </span>
+      </PrimaryButton>
+      <p className="mt-2 text-center text-[11.5px] leading-snug text-ink-faint">
+        {!ready
+          ? "Write something first — a frame needs words to sit behind."
           : on
-            ? "Remove the frame"
-            : "Render a frame behind this"}
-      </motion.button>
-      <p className="mt-2 text-[12px] leading-snug text-ink-faint">
-        {on
-          ? "The artwork was re-rendered with a panel behind the words."
-          : "The shading you see now is only for reading — it goes when you leave this panel. A frame is rendered into the artwork and stays."}
+            ? "The artwork was re-rendered with a panel behind the words."
+            : "The shading on the card now is only for reading. A frame is rendered into the artwork and stays."}
       </p>
-    </div>
+    </>
   );
 }
