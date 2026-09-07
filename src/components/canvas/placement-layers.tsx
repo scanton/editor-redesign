@@ -1,10 +1,7 @@
 "use client";
 
-import { motion } from "motion/react";
-import { Loader2, Square, SquareDashed } from "lucide-react";
 import { PlacementLayer } from "@/components/canvas/placement-layer";
 import { findLongForm } from "@/lib/long-form";
-import { springTight } from "@/lib/motion";
 import { useEditorStore, useNode } from "@/store/editor-store";
 import type { DrawNode, StickerNode } from "@/lib/types";
 
@@ -50,7 +47,6 @@ export function PlacementLayers({
         // snapping to size when you let go.
         onChange={(rect) => refitLongForm(rect)}
         onCommit={(rect) => refitLongForm(rect, longForm.status === "placed")}
-        actions={longForm.status === "placed" ? <FrameButton /> : undefined}
       />
     );
   }
@@ -104,42 +100,4 @@ export function PlacementLayers({
   }
 
   return null;
-}
-
-/**
- * Offered once there are words on the card, because it is a fix for a problem
- * you can only see by then: copy set straight onto a busy render is hard to
- * read, and a panel behind it is the answer. A re-render, not an overlay —
- * the artwork gets worked around the cleared area.
- */
-function FrameButton() {
-  const frame = useEditorStore((s) => s.longForm.frame);
-  const render = useEditorStore((s) => s.renderLongFormFrame);
-  const busy = frame === "rendering";
-  const on = frame === "placed";
-
-  return (
-    <motion.button
-      type="button"
-      onClick={render}
-      disabled={busy}
-      whileHover={busy ? undefined : { scale: 1.04, y: -1 }}
-      whileTap={busy ? undefined : { scale: 0.96 }}
-      transition={springTight}
-      className="flex items-center gap-2 whitespace-nowrap rounded-full border border-hairline bg-surface/95 py-2 pl-3 pr-3.5 text-[13px] font-semibold text-ink shadow-pop backdrop-blur"
-    >
-      {busy ? (
-        <Loader2 size={15} className="animate-spin text-brand-red" />
-      ) : on ? (
-        <Square size={15} className="text-brand-red" />
-      ) : (
-        <SquareDashed size={15} className="text-ink-soft" />
-      )}
-      {busy
-        ? "Re-rendering the panel…"
-        : on
-          ? "Remove the frame"
-          : "Render a frame behind this"}
-    </motion.button>
-  );
 }
