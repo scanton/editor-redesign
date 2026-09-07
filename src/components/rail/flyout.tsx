@@ -18,6 +18,7 @@ import { MessagePanel } from "@/components/rail/panels/message-panel";
 import { SignaturePanel } from "@/components/rail/panels/signature-panel";
 import { RevealPanel } from "@/components/rail/panels/reveal-panel";
 import { ReviewPanel } from "@/components/rail/panels/review-panel";
+import { StickersPanel } from "@/components/rail/panels/stickers-panel";
 import { StylesPanel } from "@/components/rail/panels/styles-panel";
 import { TrimPanel } from "@/components/rail/panels/trim-panel";
 import { TranslationsPanel } from "@/components/rail/panels/translations-panel";
@@ -28,6 +29,7 @@ import { useEditorStore } from "@/store/editor-store";
 
 const PANELS: Record<ToolId, React.ComponentType> = {
   styles: StylesPanel,
+  stickers: StickersPanel,
   event: EventPanel,
   message: MessagePanel,
   signature: SignaturePanel,

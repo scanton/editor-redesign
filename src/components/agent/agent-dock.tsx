@@ -18,6 +18,7 @@ import { useState } from "react";
 import { IconButton } from "@/components/ui/icon-button";
 import { Tooltip } from "@/components/ui/tooltip";
 import { springBouncy, springHeavy, staggerChild } from "@/lib/motion";
+import { LongFormThread } from "@/components/agent/long-form-thread";
 import type { AnnotationRequest, Product } from "@/lib/types";
 import { useEditorStore } from "@/store/editor-store";
 
@@ -64,6 +65,8 @@ export function AgentDock() {
   const setOpen = useEditorStore((s) => s.setAgentOpen);
   const requests = useEditorStore((s) => s.annotationRequests);
   const product = useEditorStore((s) => s.product);
+  // Long-form hands the agent a question to ask, so the thread lives here.
+  const longFormKind = useEditorStore((s) => s.longForm.kind);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [draft, setDraft] = useState("");
 
@@ -108,13 +111,15 @@ export function AgentDock() {
               </p>
             </motion.div>
 
+            {longFormKind && <LongFormThread avatar={<AgentAvatar />} />}
+
             {requests.map((request) => (
               <AnnotationMessage key={request.id} request={request} />
             ))}
           </div>
 
           <AnimatePresence>
-            {showSuggestions && requests.length === 0 && (
+            {showSuggestions && requests.length === 0 && !longFormKind && (
               <motion.div
                 initial={{ opacity: 0, y: 16 }}
                 animate={{ opacity: 1, y: 0 }}

@@ -56,7 +56,7 @@ const SOURCES: Source[] = [
  * docx) is a server job, so it's stubbed with clearly-labelled output.
  */
 export function LongFormUpload() {
-  const uploadedText = useEditorStore((s) => s.longForm.uploadedText);
+  const draft = useEditorStore((s) => s.longForm.draft);
   const fileName = useEditorStore((s) => s.longForm.fileName);
   const setLongForm = useEditorStore((s) => s.setLongForm);
 
@@ -86,7 +86,7 @@ export function LongFormUpload() {
       setStubbed(false);
       file
         .text()
-        .then((text) => setLongForm({ uploadedText: text.trim() }))
+        .then((text) => setLongForm({ draft: text.trim() }))
         .finally(() => setReading(false));
       return;
     }
@@ -95,7 +95,7 @@ export function LongFormUpload() {
     const kind = file.type.startsWith("image/") ? "photo" : "document";
     window.setTimeout(() => {
       setLongForm({
-        uploadedText:
+        draft:
           `[Stub — text lifted from your ${kind} would appear here, ready to edit.]\n\n` +
           `We read “${file.name}” and pulled out the writing. In the real editor ` +
           `this is OCR for photos and a document parser for rtf and docx, both ` +
@@ -110,7 +110,7 @@ export function LongFormUpload() {
     if (preview) URL.revokeObjectURL(preview);
     setPreview(null);
     setStubbed(false);
-    setLongForm({ uploadedText: "", fileName: null });
+    setLongForm({ draft: "", fileName: null });
   };
 
   return (
@@ -243,14 +243,14 @@ export function LongFormUpload() {
       <Section title="Your text">
         <textarea
           rows={8}
-          value={uploadedText}
-          onChange={(e) => setLongForm({ uploadedText: e.target.value })}
+          value={draft}
+          onChange={(e) => setLongForm({ draft: e.target.value })}
           placeholder="Upload something above, or type it here."
           className={cn(inputClass, "resize-none leading-relaxed")}
         />
-        {uploadedText.length > 0 && (
+        {draft.length > 0 && (
           <p className="mt-1.5 text-[11.5px] text-ink-faint">
-            {uploadedText.trim().split(/\s+/).length} words
+            {draft.trim().split(/\s+/).length} words
           </p>
         )}
       </Section>

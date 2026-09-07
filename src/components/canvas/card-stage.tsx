@@ -189,6 +189,20 @@ function NodeView({
     );
   }
 
+  if (node.kind === "sticker") {
+    return (
+      <Text
+        {...common}
+        text={node.glyph}
+        fontSize={node.size}
+        // Emoji come from the system font; naming a family would lose them.
+        width={node.size * 1.2}
+        align="center"
+        listening={false}
+      />
+    );
+  }
+
   // The artwork is the flat render — it is the card, not something on it, so
   // it takes the card's trim rather than overhanging the cut corners.
   return <ArtworkNode node={node} corner={corner} />;

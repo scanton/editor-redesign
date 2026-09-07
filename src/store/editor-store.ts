@@ -23,8 +23,11 @@ import {
 import { SWITCHER_INSET, TOOLBAR_INSET } from "@/lib/card-transform";
 import {
   defaultLongFormRect,
+  findApproach,
   findLongForm,
+  fitFontSize,
   sampleFor,
+  type LongFormApproach,
   type LongFormLength,
 } from "@/lib/long-form";
 import {
@@ -49,6 +52,11 @@ import type {
   ToolId,
 } from "@/lib/types";
 import { boundsOf, paintedBounds } from "@/lib/lasso";
+import {
+  STICKER_SIZE,
+  findSticker,
+  glyphForPrompt,
+} from "@/lib/stickers";
 import { STEP_DEFAULT_TOOL, stepTools } from "@/lib/steps";
 import type {
   DigitalDelivery,
@@ -62,6 +70,23 @@ const MAX_HISTORY = 50;
 
 /** Single long-form block per card, so it can be replaced rather than stacked. */
 export const LONG_FORM_NODE_ID = "long_form_block";
+/** The panel rendered into the artwork behind that block. */
+export const LONG_FORM_FRAME_ID = "long_form_frame";
+/** Leading for long-form copy, shared by the fitter and the node. */
+const LONG_FORM_LEADING = 1.45;
+
+/** The frame geometry for a placement box — a little larger than the words. */
+function framePanel(rect: AnnotationRect) {
+  const pad = 26;
+  return {
+    x: rect.x - pad,
+    y: rect.y - pad,
+    width: rect.width + pad * 2,
+    height: rect.height + pad * 2,
+    fill: "rgba(18,18,20,0.72)",
+    cornerRadius: 20,
+  };
+}
 
 /**
  * Breathing room around the card. The vertical figure has to clear both pieces
@@ -273,29 +298,58 @@ type EditorState = {
   clearBrush: () => void;
   submitErase: () => void;
 
+  /**
+   * Stickers: chosen from the shelf or described to the agent, then dropped on
+   * the finished artwork. Composited rather than rendered in, so moving one
+   * never costs anything.
+   */
+  selectedSticker: string | null;
+  setSelectedSticker: (id: string | null) => void;
+  addSticker: (stickerId: string) => void;
+  /** Stub: the agent renders one from a description. */
+  stickerPrompt: string;
+  setStickerPrompt: (prompt: string) => void;
+  makingSticker: boolean;
+  makeSticker: () => void;
+
   /** Translations: pick a target language, agent re-renders every face. */
   targetLanguage: string | null;
   setTargetLanguage: (id: string | null) => void;
   translationStatus: "idle" | "translating" | "done";
   requestTranslation: () => void;
 
-  /** Long-form text: what to write, how long, and where it lands on the card. */
+  /** Long-form text: what to write, how it gets written, and where it lands. */
   longForm: {
-    /** Where the words come from: the agent writes them, or the user brings them. */
-    source: "write" | "upload";
     kind: string | null;
-    brief: string;
+    /**
+     * How much of the writing the customer wants to do. Null until the agent
+     * has asked — picking a kind opens a question rather than starting a job.
+     */
+    approach: LongFormApproach | null;
+    /** Whatever they hand over: finished text, a rough draft, or bullets. */
+    draft: string;
     length: LongFormLength;
-    /** Text lifted off a photo or a document, editable before it's placed. */
-    uploadedText: string;
+    /** Set when the draft was lifted off a photo or a document. */
     fileName: string | null;
     face: FaceId;
     rect: AnnotationRect;
     status: "idle" | "writing" | "placed";
+    /**
+     * A panel rendered into the artwork behind the words. Copy set straight
+     * onto a busy render is often unreadable, and this is the fix the agent
+     * offers rather than one it applies unasked.
+     */
+    frame: "none" | "rendering" | "placed";
   };
   setLongForm: (patch: Partial<EditorState["longForm"]>) => void;
   resetLongFormPlacement: () => void;
+  /** Pick how the writing gets done; the agent asks for what it needs next. */
+  chooseApproach: (approach: LongFormApproach | null) => void;
   requestLongForm: () => void;
+  /** Keep the copy filling its box as the box is dragged and resized. */
+  refitLongForm: (rect: AnnotationRect, commit?: boolean) => void;
+  /** Re-render the artwork with a panel behind the words, or take it away. */
+  renderLongFormFrame: () => void;
 
   commit: () => void;
   undo: () => void;
@@ -307,6 +361,45 @@ type EditorState = {
 
 function cloneDoc(doc: CardDoc): CardDoc {
   return structuredClone(doc);
+}
+
+/**
+ * Drop a sticker on the face being looked at, slightly off centre so a second
+ * one does not land exactly on the first, and select it so it can be moved.
+ */
+function placeSticker(
+  state: EditorState,
+  stickerId: string,
+  glyph: string,
+  label: string,
+) {
+  const doc = cloneDoc(state.doc);
+  const face = doc.faces[state.face];
+  const size = Math.min(face.width, face.height) * STICKER_SIZE;
+  const placed = face.nodes.filter((n) => n.kind === "sticker").length;
+  const drift = (placed % 5) * size * 0.35;
+
+  const node: EditorNode = {
+    id: uid("sticker"),
+    kind: "sticker",
+    name: label,
+    stickerId,
+    glyph,
+    label,
+    size,
+    x: (face.width - size) / 2 - size * 0.6 + drift,
+    y: (face.height - size) / 2 - size * 0.6 + drift,
+    rotation: 0,
+    opacity: 1,
+  };
+  face.nodes.push(node);
+
+  return {
+    doc,
+    past: [...state.past, cloneDoc(state.doc)].slice(-MAX_HISTORY),
+    future: [],
+    selectedSticker: node.id,
+  };
 }
 
 /** Records a section as passed. Opening it is the visit; nothing is required. */
@@ -983,50 +1076,96 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     setTimeout(() => set({ translationStatus: "done" }), 2400);
   },
 
+  selectedSticker: null,
+  setSelectedSticker: (selectedSticker) => set({ selectedSticker }),
+
+  addSticker: (stickerId) => {
+    const state = get();
+    const sticker = findSticker(stickerId);
+    if (!sticker) return;
+    set(placeSticker(state, sticker.id, sticker.glyph, sticker.label));
+  },
+
+  stickerPrompt: "",
+  setStickerPrompt: (stickerPrompt) => set({ stickerPrompt }),
+  makingSticker: false,
+  makeSticker: () => {
+    const prompt = get().stickerPrompt.trim();
+    if (!prompt || get().makingSticker) return;
+    set({ makingSticker: true });
+
+    // Stub — the agent would render a sticker from this. A stand-in glyph
+    // keeps it stable per description so the shelf does not shuffle.
+    window.setTimeout(() => {
+      const state = get();
+      set({
+        ...placeSticker(state, "made", glyphForPrompt(prompt), prompt),
+        makingSticker: false,
+        stickerPrompt: "",
+      });
+    }, 2000);
+  },
+
   longForm: {
-    source: "write",
     kind: null,
-    brief: "",
+    approach: null,
+    draft: "",
     length: "medium",
-    uploadedText: "",
     fileName: null,
     face: "inside",
     rect: defaultLongFormRect(),
     status: "idle",
+    frame: "none",
   },
   setLongForm: (patch) =>
     set((s) => ({ longForm: { ...s.longForm, ...patch } })),
-  resetLongFormPlacement: () =>
-    set((s) => ({ longForm: { ...s.longForm, rect: defaultLongFormRect() } })),
+  resetLongFormPlacement: () => {
+    const rect = defaultLongFormRect();
+    get().refitLongForm(rect, true);
+  },
+
+  // Picking a kind is not an instruction to write — it opens the question of
+  // who is doing the writing, which the agent asks in the dock.
+  chooseApproach: (approach) =>
+    set((s) => ({
+      longForm: { ...s.longForm, approach, draft: "" },
+      agentOpen: true,
+    })),
 
   requestLongForm: () => {
     const { longForm } = get();
-    const uploading = longForm.source === "upload";
     const option = findLongForm(longForm.kind);
-    const body = uploading ? longForm.uploadedText.trim() : null;
-    if (uploading ? !body : !option) return;
+    const approach = findApproach(longForm.approach);
+    if (!option || !approach || !longForm.draft.trim()) return;
 
     set({ longForm: { ...longForm, status: "writing" } });
 
-    // Stub — the agent would write this. We drop in sample copy of the right
-    // shape so the block can be seen flowing into the placement rect.
-    setTimeout(() => {
+    // Stub — the agent would write, polish or expand this. Pasted text is used
+    // as given; everything else stands in with sample copy of the right shape,
+    // so the block can be seen flowing into the box it was placed in.
+    window.setTimeout(() => {
       const state = get();
       const rect = state.longForm.rect;
+      const text =
+        state.longForm.approach === "paste"
+          ? state.longForm.draft.trim()
+          : sampleFor(option.shape);
+
       const node: EditorNode = {
         id: LONG_FORM_NODE_ID,
         kind: "text",
-        name: uploading ? "Uploaded text" : option!.label,
-        text: body ?? sampleFor(option!.shape),
+        name: option.label,
+        text,
         x: rect.x,
         y: rect.y,
         width: rect.width,
-        fontSize: 34,
+        // Set to fill the box it was given rather than to a fixed size.
+        fontSize: fitFontSize(text, rect.width, rect.height, LONG_FORM_LEADING),
         fontFamily: "DM Sans",
         fontStyle: "normal",
         fill: "#f7f0dd",
         align: "left",
-        lineHeight: 1.5,
+        lineHeight: LONG_FORM_LEADING,
         letterSpacing: 0,
         rotation: 0,
         opacity: 1,
@@ -1043,7 +1182,83 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         future: [],
         longForm: { ...state.longForm, status: "placed" },
       });
-    }, uploading ? 400 : 2400);
+    }, approach.delay);
+  },
+
+  refitLongForm: (rect, commit = false) =>
+    set((s) => {
+      const doc = cloneDoc(s.doc);
+      const face = doc.faces[s.longForm.face];
+      const node = face.nodes.find((n) => n.id === LONG_FORM_NODE_ID);
+
+      if (node && node.kind === "text") {
+        node.x = rect.x;
+        node.y = rect.y;
+        node.width = rect.width;
+        node.fontSize = fitFontSize(
+          node.text,
+          rect.width,
+          rect.height,
+          LONG_FORM_LEADING,
+        );
+      }
+
+      // The frame was drawn around the box, so it follows the box.
+      const frame = face.nodes.find((n) => n.id === LONG_FORM_FRAME_ID);
+      if (frame && frame.kind === "shape") Object.assign(frame, framePanel(rect));
+
+      return {
+        doc,
+        longForm: { ...s.longForm, rect },
+        ...(commit
+          ? { past: [...s.past, cloneDoc(s.doc)].slice(-MAX_HISTORY), future: [] }
+          : {}),
+      };
+    }),
+
+  renderLongFormFrame: () => {
+    const { longForm } = get();
+    if (longForm.status !== "placed" || longForm.frame === "rendering") return;
+
+    // Taking it off again is a removal, not a render.
+    if (longForm.frame === "placed") {
+      const doc = cloneDoc(get().doc);
+      const face = doc.faces[longForm.face];
+      face.nodes = face.nodes.filter((n) => n.id !== LONG_FORM_FRAME_ID);
+      set({ doc, longForm: { ...longForm, frame: "none" } });
+      return;
+    }
+
+    set({ longForm: { ...longForm, frame: "rendering" } });
+
+    // Stub — the real thing re-renders the panel with the artwork worked
+    // around a cleared area, rather than laying a shape over the top of it.
+    window.setTimeout(() => {
+      const state = get();
+      const doc = cloneDoc(state.doc);
+      const face = doc.faces[state.longForm.face];
+      face.nodes = face.nodes.filter((n) => n.id !== LONG_FORM_FRAME_ID);
+
+      const frame: EditorNode = {
+        id: LONG_FORM_FRAME_ID,
+        kind: "shape",
+        name: "Text frame",
+        shape: "rect",
+        rotation: 0,
+        opacity: 1,
+        ...framePanel(state.longForm.rect),
+      };
+      // Behind the words, so it goes in ahead of them.
+      const index = face.nodes.findIndex((n) => n.id === LONG_FORM_NODE_ID);
+      face.nodes.splice(index < 0 ? face.nodes.length : index, 0, frame);
+
+      set({
+        doc,
+        past: [...state.past, cloneDoc(state.doc)].slice(-MAX_HISTORY),
+        future: [],
+        longForm: { ...state.longForm, frame: "placed" },
+      });
+    }, 2000);
   },
 
   commit: () =>

@@ -28,8 +28,15 @@ export function stepTools(
 ): ToolId[] {
   if (step === 1)
     return product === "invitation"
-      ? ["styles", "event", "translations"]
-      : ["styles", "message", "longform", "signature", "translations"];
+      ? ["styles", "event", "stickers", "translations"]
+      : [
+          "styles",
+          "message",
+          "longform",
+          "signature",
+          "stickers",
+          "translations",
+        ];
   if (step === 2) {
     if (cardType === "digital")
       return ["cardtype", "background", "envelope", "reveal", "cover"];
