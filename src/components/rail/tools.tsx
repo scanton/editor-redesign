@@ -91,7 +91,7 @@ export const TOOLS: ToolDef[] = [
     id: "background",
     label: "Background",
     icon: ImagePlay,
-    blurb: "The 3D scene behind the card.",
+    blurb: "The scene behind the card.",
   },
   {
     id: "envelope",

@@ -17,7 +17,7 @@ const PRICING: Record<Product, Rendition[]> = {
   card: [
     {
       id: "digital",
-      label: "Digital 3D card",
+      label: "Digital card",
       price: "$2.99 each",
       unit: 2.99,
       note: "Opens on their screen with a scene, an envelope and a reveal. Sent by link, email or as a video.",
@@ -33,7 +33,7 @@ const PRICING: Record<Product, Rendition[]> = {
   invitation: [
     {
       id: "digital",
-      label: "Digital 3D invitation",
+      label: "Digital invitation",
       price: "$1.49 each",
       unit: 1.49,
       note: "An animated reveal guests open from a link, with the RSVP page attached. Billed per invitation sent.",
