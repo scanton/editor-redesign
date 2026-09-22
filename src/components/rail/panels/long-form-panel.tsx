@@ -30,10 +30,20 @@ import {
   LONG_FORM_GROUPS,
   PX_PER_INCH,
   findFrameTreatment,
+  findLength,
   findLongForm,
+  MIN_PRINT_PT,
+  overflowsBox,
+  wordBudget,
+  wordCapacity,
   type LongFormLength,
 } from "@/lib/long-form";
-import { useEditorStore } from "@/store/editor-store";
+import {
+  LONG_FORM_NODE_ID,
+  useEditorStore,
+  useNode,
+} from "@/store/editor-store";
+import type { TextNode } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /**
@@ -146,9 +156,12 @@ export function LongFormPanel() {
               setLongForm({ length: length as LongFormLength })
             }
           />
-          <p className="mt-2 text-[12px] text-ink-faint">
-            {LENGTHS.find((l) => l.value === longForm.length)?.words} — then set
-            to fill the box you place on the card.
+          <p className="mt-2 text-[12px] leading-snug text-ink-faint">
+            Set at {findLength(longForm.length).pt}pt, which is about{" "}
+            {wordBudget(longForm.rect, longForm.length).target} words in a box
+            this size. Length is a type size rather than a word count, because
+            the same words are comfortable in a big box and unreadable in a
+            small one.
           </p>
         </Section>
 
@@ -183,6 +196,7 @@ export function LongFormPanel() {
             </p>
           </div>
 
+          <Overflow />
         </Section>
         </motion.div>
       </PanelBody>
@@ -194,6 +208,36 @@ export function LongFormPanel() {
         <FrameControl />
       </PanelFooter>
     </>
+  );
+}
+
+/**
+ * Said out loud rather than solved quietly. The fitter will not set type below
+ * what we are willing to print, so past that point the block runs past its box
+ * instead of shrinking, and the customer needs to know which of the two fixes
+ * is theirs to make.
+ */
+function Overflow() {
+  const rect = useEditorStore((s) => s.longForm.rect);
+  const text = useNode<TextNode>(LONG_FORM_NODE_ID)?.text ?? "";
+  if (!overflowsBox(text, rect)) return null;
+
+  const fits = wordCapacity(rect.width, rect.height, MIN_PRINT_PT);
+  const have = text.trim().split(/\s+/).length;
+
+  return (
+    <motion.p
+      initial={{ opacity: 0, y: -4 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={springTight}
+      className="mt-2.5 rounded-[12px] bg-brand-red/5 p-3 text-[12px] leading-snug text-ink-soft"
+    >
+      <span className="font-semibold text-brand-red">
+        That is more than the box will hold.
+      </span>{" "}
+      About {have} words against room for {fits} at {MIN_PRINT_PT}pt, the
+      smallest we will print. Make the box bigger, or cut it back.
+    </motion.p>
   );
 }
 
