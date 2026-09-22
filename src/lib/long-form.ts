@@ -220,12 +220,71 @@ export function findLongForm(id: string | null) {
 
 export type LongFormLength = "short" | "medium" | "long";
 
-export const LENGTHS: { value: LongFormLength; label: string; words: string }[] =
-  [
-    { value: "short", label: "Short", words: "~120 words" },
-    { value: "medium", label: "Medium", words: "~250 words" },
-    { value: "long", label: "Long", words: "~400 words" },
-  ];
+/**
+ * The smallest type we will set on a printed card. Below about 9pt a card held
+ * at arm's length stops being readable, and a block that has quietly shrunk to
+ * fit is worse than one that plainly did not.
+ */
+export const MIN_PRINT_PT = 9;
+
+/** Points to card pixels. A 5in panel is 1056px wide, so 211.2px to the inch. */
+export function ptToPx(pt: number) {
+  return (pt / 72) * PX_PER_INCH;
+}
+
+/**
+ * Length is a type size, not a word count.
+ *
+ * A fixed word count cannot be a promise about anything, because the block
+ * auto-fits: the same 250 words are comfortable in a big box and unreadable in
+ * a small one. Naming the size instead makes the promise the one that matters,
+ * and the word budget falls out of the size and the box together.
+ */
+export const LENGTHS: { value: LongFormLength; label: string; pt: number }[] = [
+  { value: "short", label: "Short", pt: 14 },
+  { value: "medium", label: "Medium", pt: 11 },
+  { value: "long", label: "Long", pt: MIN_PRINT_PT },
+];
+
+export function findLength(value: LongFormLength) {
+  return LENGTHS.find((l) => l.value === value)!;
+}
+
+/** How many words a box holds at a given type size, by the fitter's own maths. */
+export function wordCapacity(width: number, height: number, pt: number) {
+  const size = ptToPx(pt);
+  const perLine = Math.max(1, Math.floor(width / (size * AVG_GLYPH)));
+  const lines = Math.max(1, Math.floor(height / (size * LONG_FORM_LEADING)));
+  return Math.floor((perLine * lines) / CHARS_PER_WORD);
+}
+
+/**
+ * What to ask the writer for: the target is what fits at the chosen size, and
+ * the maximum is what fits at the smallest size we will print. Past the
+ * maximum there is no size left to shrink to.
+ */
+export function wordBudget(
+  rect: { width: number; height: number },
+  length: LongFormLength,
+) {
+  return {
+    target: wordCapacity(rect.width, rect.height, findLength(length).pt),
+    max: wordCapacity(rect.width, rect.height, MIN_PRINT_PT),
+    minPt: MIN_PRINT_PT,
+  };
+}
+
+/** True when the words cannot be set inside the box without going under 9pt. */
+export function overflowsBox(
+  text: string,
+  rect: { width: number; height: number },
+) {
+  if (!text.trim()) return false;
+  return (
+    estimateHeight(text, rect.width, ptToPx(MIN_PRINT_PT), LONG_FORM_LEADING) >
+    rect.height
+  );
+}
 
 /**
  * Placeholder copy so the demo can show text actually flowing into the block.
@@ -340,6 +399,10 @@ export function findApproach(id: LongFormApproach | null) {
  * accuracy is worth.
  */
 const AVG_GLYPH = 0.5;
+/** Leading the block is set with, shared by the fitter and the store. */
+export const LONG_FORM_LEADING = 1.45;
+/** Rough words per character, for turning box area into a word budget. */
+const CHARS_PER_WORD = 5.5;
 
 function estimateHeight(
   text: string,
@@ -377,12 +440,18 @@ function estimateHeight(
   return lines * size * lineHeight;
 }
 
+/**
+ * The size that fills the box without spilling out of it, never going below
+ * what we are willing to print. When even the floor will not hold the text,
+ * the floor is what comes back and the block overflows visibly: better seen in
+ * the editor than discovered in the post.
+ */
 export function fitFontSize(
   text: string,
   width: number,
   height: number,
-  lineHeight = 1.5,
-  { min = 14, max = 110 } = {},
+  lineHeight = LONG_FORM_LEADING,
+  { min = ptToPx(MIN_PRINT_PT), max = 110 } = {},
 ) {
   if (!text.trim() || width <= 0 || height <= 0) return min;
   for (let size = max; size > min; size -= 1) {

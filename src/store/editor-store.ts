@@ -27,6 +27,7 @@ import {
   findFrameTreatment,
   findLongForm,
   fitFontSize,
+  LONG_FORM_LEADING,
   sampleFor,
   type FrameTreatment,
   type LongFormApproach,
@@ -74,9 +75,6 @@ const MAX_HISTORY = 50;
 export const LONG_FORM_NODE_ID = "long_form_block";
 /** The panel rendered into the artwork behind that block. */
 export const LONG_FORM_FRAME_ID = "long_form_frame";
-/** Leading for long-form copy, shared by the fitter and the node. */
-const LONG_FORM_LEADING = 1.45;
-
 /**
  * The frame geometry for a placement box — a little larger than the words.
  * Each treatment paints it differently, so the four choices are told apart on
