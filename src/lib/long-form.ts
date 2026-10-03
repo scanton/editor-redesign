@@ -95,6 +95,41 @@ export const LONG_FORM_GROUPS: LongFormGroup[] = [
     ],
   },
   {
+    label: "Letters & notes",
+    options: [
+      {
+        id: "love-letter",
+        label: "Love letter",
+        blurb: "Unhurried and specific",
+        shape: "prose",
+      },
+      {
+        id: "apology-letter",
+        label: "Apology letter",
+        blurb: "Owns it, without the excuses",
+        shape: "prose",
+      },
+      {
+        id: "open-letter",
+        label: "Open letter",
+        blurb: "Something you've wanted to say",
+        shape: "prose",
+      },
+      {
+        id: "thank-you",
+        label: "Thank-you note",
+        blurb: "Names the thing they actually did",
+        shape: "prose",
+      },
+      {
+        id: "advice",
+        label: "Advice & wishes",
+        blurb: "What you'd tell them starting out",
+        shape: "list",
+      },
+    ],
+  },
+  {
     label: "Verse & song",
     options: [
       {
@@ -124,31 +159,31 @@ export const LONG_FORM_GROUPS: LongFormGroup[] = [
     ],
   },
   {
-    label: "Letters & notes",
+    label: "Milestones",
     options: [
       {
-        id: "love-letter",
-        label: "Love letter",
-        blurb: "Unhurried and specific",
+        id: "graduate-letter",
+        label: "Letter to a graduate",
+        blurb: "For the one who just finished",
         shape: "prose",
       },
       {
-        id: "open-letter",
-        label: "Open letter",
-        blurb: "Something you've wanted to say",
+        id: "retirement-letter",
+        label: "Retirement letter",
+        blurb: "A working life, properly thanked",
         shape: "prose",
       },
       {
-        id: "thank-you",
-        label: "Thank-you note",
-        blurb: "Names the thing they actually did",
+        id: "newborn-letter",
+        label: "Letter to a newborn",
+        blurb: "For them to read when they're grown",
         shape: "prose",
       },
       {
-        id: "advice",
-        label: "Advice & wishes",
-        blurb: "What you'd tell them starting out",
-        shape: "list",
+        id: "coming-of-age-letter",
+        label: "Coming-of-age letter",
+        blurb: "For the day they grow up a little",
+        shape: "prose",
       },
     ],
   },
@@ -168,16 +203,97 @@ export const LONG_FORM_GROUPS: LongFormGroup[] = [
         shape: "prose",
       },
       {
+        id: "vows",
+        label: "Wedding vows",
+        blurb: "Promises, in your own words",
+        shape: "verse",
+      },
+    ],
+  },
+  {
+    label: "Speeches",
+    options: [
+      {
+        id: "wedding-speech",
+        label: "Wedding speech",
+        blurb: "For whoever is holding the microphone",
+        shape: "prose",
+      },
+      {
+        id: "farewell-speech",
+        label: "Farewell speech",
+        blurb: "A goodbye, read aloud",
+        shape: "prose",
+      },
+      {
+        id: "roast",
+        label: "Roast",
+        blurb: "Affectionate, and a little merciless",
+        shape: "prose",
+      },
+    ],
+  },
+  {
+    label: "Faith & legacy",
+    options: [
+      {
+        id: "sermon",
+        label: "Sermon",
+        blurb: "The heart of the message",
+        shape: "prose",
+      },
+      {
         id: "blessing",
         label: "Blessing",
         blurb: "A few lines of good wishes",
         shape: "verse",
       },
       {
-        id: "vows",
-        label: "Wedding vows",
-        blurb: "Promises, in your own words",
-        shape: "verse",
+        id: "legacy-letter",
+        label: "Legacy letter",
+        blurb: "What you want them to carry on",
+        shape: "prose",
+      },
+      {
+        id: "open-later-letter",
+        label: "Letter to open later",
+        blurb: "Sealed until the moment comes",
+        shape: "prose",
+      },
+    ],
+  },
+  {
+    label: "Support & loss",
+    options: [
+      {
+        id: "celebration-of-life-bio",
+        label: "Celebration of life bio",
+        blurb: "A life, told for the people who gather",
+        shape: "prose",
+      },
+      {
+        id: "sympathy-letter",
+        label: "Sympathy letter",
+        blurb: "Plain words for a hard time",
+        shape: "prose",
+      },
+      {
+        id: "get-well-letter",
+        label: "Get well letter",
+        blurb: "Company while they recover",
+        shape: "prose",
+      },
+      {
+        id: "encouragement-letter",
+        label: "Encouragement letter",
+        blurb: "For when the going is hard",
+        shape: "prose",
+      },
+      {
+        id: "pet-memorial",
+        label: "Pet memorial",
+        blurb: "For the one who waited by the door",
+        shape: "prose",
       },
     ],
   },
