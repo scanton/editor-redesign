@@ -3,20 +3,33 @@ import {
   SPREAD_HEIGHT,
   SPREAD_WIDTH,
 } from "./sample-card";
-import type { AnnotationRect } from "./types";
+import type { AnnotationRect, FaceId } from "./types";
 
 /**
- * Print geometry, derived from the artwork: a 5×7 panel is 1056×1488, so
- * 211px = 1 inch.
- *
+ * Print geometry, derived from the artwork. The faces are not drawn at one
+ * scale: a 5×7 panel is 1056×1488, so 211.2px to the inch, while the inside is
+ * the whole 10×7 spread squeezed into 1488×1056, so 148.8px to the inch.
+ * Anything measured in inches or points has to know which face it is on.
+ */
+export const PX_PER_INCH = PANEL_WIDTH / 5;
+export const SPREAD_PX_PER_INCH = SPREAD_WIDTH / 10;
+
+export function pxPerInch(face: FaceId) {
+  return face === "inside" ? SPREAD_PX_PER_INCH : PX_PER_INCH;
+}
+
+/**
  * Commercial trim tolerance is about 1/8", and anything within about 1/4" of
  * the edge reads as crowded once the card is cut — so text stays 0.3" clear.
  * Long-form blocks sit further in still, to leave the artwork somewhere to
  * breathe around them.
  */
-export const PX_PER_INCH = PANEL_WIDTH / 5;
-export const CUT_SAFE_MARGIN = Math.round(0.3 * PX_PER_INCH);
-const ART_BREATHING_ROOM = Math.round(0.3 * PX_PER_INCH);
+export const CUT_SAFE_INCHES = 0.3;
+const ART_BREATHING_INCHES = 0.3;
+
+export function cutSafeMargin(face: FaceId) {
+  return Math.round(CUT_SAFE_INCHES * pxPerInch(face));
+}
 
 /**
  * Default long-form placement: the left-hand panel of the inside spread,
@@ -28,7 +41,9 @@ const ART_BREATHING_ROOM = Math.round(0.3 * PX_PER_INCH);
  * signature the customer fills in on the right.
  */
 export function defaultLongFormRect(): AnnotationRect {
-  const inset = CUT_SAFE_MARGIN + ART_BREATHING_ROOM;
+  const ppi = SPREAD_PX_PER_INCH;
+  const inset =
+    Math.round(CUT_SAFE_INCHES * ppi) + Math.round(ART_BREATHING_INCHES * ppi);
   // The fold runs down the middle of the spread.
   const fold = SPREAD_WIDTH / 2;
   return {
@@ -40,12 +55,13 @@ export function defaultLongFormRect(): AnnotationRect {
 }
 
 /** The printable region of a face — blocks are clamped inside it. */
-export function safeArea(face: { width: number; height: number }) {
+export function safeArea(face: { id: FaceId; width: number; height: number }) {
+  const margin = cutSafeMargin(face.id);
   return {
-    x: CUT_SAFE_MARGIN,
-    y: CUT_SAFE_MARGIN,
-    width: face.width - CUT_SAFE_MARGIN * 2,
-    height: face.height - CUT_SAFE_MARGIN * 2,
+    x: margin,
+    y: margin,
+    width: face.width - margin * 2,
+    height: face.height - margin * 2,
   };
 }
 
@@ -314,7 +330,7 @@ export const LONG_FORM_GROUPS: LongFormGroup[] = [
       },
       {
         id: "memory",
-        label: "Favourite memory",
+        label: "Favorite memory",
         blurb: "One day, told properly",
         shape: "prose",
       },
@@ -343,9 +359,9 @@ export type LongFormLength = "short" | "medium" | "long";
  */
 export const MIN_PRINT_PT = 9;
 
-/** Points to card pixels. A 5in panel is 1056px wide, so 211.2px to the inch. */
-export function ptToPx(pt: number) {
-  return (pt / 72) * PX_PER_INCH;
+/** Points to card pixels, at the scale of the face the type is set on. */
+export function ptToPx(pt: number, ppi: number) {
+  return (pt / 72) * ppi;
 }
 
 /**
@@ -367,8 +383,13 @@ export function findLength(value: LongFormLength) {
 }
 
 /** How many words a box holds at a given type size, by the fitter's own maths. */
-export function wordCapacity(width: number, height: number, pt: number) {
-  const size = ptToPx(pt);
+export function wordCapacity(
+  width: number,
+  height: number,
+  pt: number,
+  ppi: number,
+) {
+  const size = ptToPx(pt, ppi);
   const perLine = Math.max(1, Math.floor(width / (size * AVG_GLYPH)));
   const lines = Math.max(1, Math.floor(height / (size * LONG_FORM_LEADING)));
   return Math.floor((perLine * lines) / CHARS_PER_WORD);
@@ -382,10 +403,11 @@ export function wordCapacity(width: number, height: number, pt: number) {
 export function wordBudget(
   rect: { width: number; height: number },
   length: LongFormLength,
+  ppi: number,
 ) {
   return {
-    target: wordCapacity(rect.width, rect.height, findLength(length).pt),
-    max: wordCapacity(rect.width, rect.height, MIN_PRINT_PT),
+    target: wordCapacity(rect.width, rect.height, findLength(length).pt, ppi),
+    max: wordCapacity(rect.width, rect.height, MIN_PRINT_PT, ppi),
     minPt: MIN_PRINT_PT,
   };
 }
@@ -394,11 +416,16 @@ export function wordBudget(
 export function overflowsBox(
   text: string,
   rect: { width: number; height: number },
+  ppi: number,
 ) {
   if (!text.trim()) return false;
   return (
-    estimateHeight(text, rect.width, ptToPx(MIN_PRINT_PT), LONG_FORM_LEADING) >
-    rect.height
+    estimateHeight(
+      text,
+      rect.width,
+      ptToPx(MIN_PRINT_PT, ppi),
+      LONG_FORM_LEADING,
+    ) > rect.height
   );
 }
 
@@ -566,8 +593,9 @@ export function fitFontSize(
   text: string,
   width: number,
   height: number,
+  ppi: number,
   lineHeight = LONG_FORM_LEADING,
-  { min = ptToPx(MIN_PRINT_PT), max = 110 } = {},
+  { min = ptToPx(MIN_PRINT_PT, ppi), max = 110 } = {},
 ) {
   if (!text.trim() || width <= 0 || height <= 0) return min;
   for (let size = max; size > min; size -= 1) {

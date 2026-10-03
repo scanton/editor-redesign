@@ -25,15 +25,15 @@ import {
 import { CARD_FONTS, RECOMMENDED_COLORS, fontCssVar } from "@/lib/fonts";
 import { springBouncy, springTight, staggerParent } from "@/lib/motion";
 import {
-  CUT_SAFE_MARGIN,
+  CUT_SAFE_INCHES,
   LENGTHS,
   LONG_FORM_GROUPS,
-  PX_PER_INCH,
   findFrameTreatment,
   findLength,
   findLongForm,
   MIN_PRINT_PT,
   overflowsBox,
+  pxPerInch,
   wordBudget,
   wordCapacity,
   type LongFormLength,
@@ -74,7 +74,8 @@ export function LongFormPanel() {
   }, []);
 
   const option = findLongForm(longForm.kind);
-  const inches = (px: number) => (px / PX_PER_INCH).toFixed(1);
+  const ppi = pxPerInch(longForm.face);
+  const inches = (px: number) => (px / ppi).toFixed(1);
 
   return (
     <>
@@ -158,7 +159,7 @@ export function LongFormPanel() {
           />
           <p className="mt-2 text-[12px] leading-snug text-ink-faint">
             Set at {findLength(longForm.length).pt}pt, which is about{" "}
-            {wordBudget(longForm.rect, longForm.length).target} words in a box
+            {wordBudget(longForm.rect, longForm.length, ppi).target} words in a box
             this size. Length is a type size rather than a word count, because
             the same words are comfortable in a big box and unreadable in a
             small one.
@@ -191,7 +192,7 @@ export function LongFormPanel() {
               Click the box on the card to type into it, drag it to move, or
               pull a corner to resize — the words are yours to change, and the
               type refits whatever you do. It stays{" "}
-              {(CUT_SAFE_MARGIN / PX_PER_INCH).toFixed(1)}″ clear of the trim
+              {CUT_SAFE_INCHES.toFixed(1)}″ clear of the trim
               edge so nothing is lost when the card is cut.
             </p>
           </div>
@@ -219,10 +220,11 @@ export function LongFormPanel() {
  */
 function Overflow() {
   const rect = useEditorStore((s) => s.longForm.rect);
+  const ppi = useEditorStore((s) => pxPerInch(s.longForm.face));
   const text = useNode<TextNode>(LONG_FORM_NODE_ID)?.text ?? "";
-  if (!overflowsBox(text, rect)) return null;
+  if (!overflowsBox(text, rect, ppi)) return null;
 
-  const fits = wordCapacity(rect.width, rect.height, MIN_PRINT_PT);
+  const fits = wordCapacity(rect.width, rect.height, MIN_PRINT_PT, ppi);
   const have = text.trim().split(/\s+/).length;
 
   return (

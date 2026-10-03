@@ -28,6 +28,7 @@ import {
   findLongForm,
   fitFontSize,
   LONG_FORM_LEADING,
+  pxPerInch,
   sampleFor,
   type FrameTreatment,
   type LongFormApproach,
@@ -1248,7 +1249,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         y: rect.y,
         width: rect.width,
         // Set to fill the box it was given rather than to a fixed size.
-        fontSize: fitFontSize(text, rect.width, rect.height, LONG_FORM_LEADING),
+        fontSize: fitFontSize(
+          text,
+          rect.width,
+          rect.height,
+          pxPerInch(state.longForm.face),
+          LONG_FORM_LEADING,
+        ),
         fontFamily: state.longForm.fontFamily,
         fontStyle: "normal",
         fill: state.longForm.fill,
@@ -1291,6 +1298,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           node.text,
           rect.width,
           rect.height,
+          pxPerInch(s.longForm.face),
           LONG_FORM_LEADING,
         );
       }
@@ -1367,6 +1375,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           text,
           rect.width,
           rect.height,
+          pxPerInch(s.longForm.face),
           LONG_FORM_LEADING,
         );
       } else {
@@ -1378,7 +1387,13 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           x: rect.x,
           y: rect.y,
           width: rect.width,
-          fontSize: fitFontSize(text, rect.width, rect.height, LONG_FORM_LEADING),
+          fontSize: fitFontSize(
+            text,
+            rect.width,
+            rect.height,
+            pxPerInch(s.longForm.face),
+            LONG_FORM_LEADING,
+          ),
           fontFamily: s.longForm.fontFamily,
           fontStyle: "normal",
           fill: s.longForm.fill,
