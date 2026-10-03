@@ -4,7 +4,7 @@ import { motion } from "motion/react";
 import { useId, useRef, type PointerEvent as ReactPointerEvent } from "react";
 import { springBouncy } from "@/lib/motion";
 import { cardTransform, toCardPoint, toScreenRect } from "@/lib/card-transform";
-import { CUT_SAFE_MARGIN, PX_PER_INCH, safeArea } from "@/lib/long-form";
+import { CUT_SAFE_INCHES, safeArea } from "@/lib/long-form";
 import { useEditorStore } from "@/store/editor-store";
 import type { AnnotationRect } from "@/lib/types";
 import { clamp } from "@/lib/utils";
@@ -211,7 +211,7 @@ export function PlacementLayer({
             top: transform.y + face.height * transform.scale + 10,
           }}
         >
-          Dashed line = {(CUT_SAFE_MARGIN / PX_PER_INCH).toFixed(1)}″ trim-safe
+          Dashed line = {CUT_SAFE_INCHES.toFixed(1)}″ trim-safe
           area
         </p>
       )}
